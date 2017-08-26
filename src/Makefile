@@ -1,33 +1,31 @@
-PROG =	SubChannelFlow
+SRCS =	steam_nrs.f90 neutronics_fluids_subroutines.f90
 
-SRCS =	steam_nrs.f90 Main.f90 #ReactorCode.f90
+OBJS =	steam_nrs.o neutronics_fluids_subroutines.o
 
-OBJS =	steam_nrs.o Main.o #ReactorCode.o 
-
-LIBS = -L/usr/local/lib -L/usr/lib 
+#LIBS = -L/usr/local/lib -L/usr/lib 
 
 
-CC = $(CC)
-CFLAGS = -O0
-#FC = $(FC)
-#FFLAGS = -O0
-FC      = gfortran
-F90 = $(FC)
-F90FLAGS =  -r8
-F90FLAGS =  -g
-LDFLAGS = -O0 -r8 #-cpp
+F90 = gfortran
 F90FLAGS  = -ffast-math -frecord-marker=4 -ffree-line-length-none -ffixed-line-length-none  -O3 -fdefault-real-8 
-LINKER  = g++   
+  
 
-all: $(PROG)
+#all: $(PROG)
 
-$(PROG):	$(OBJS)
-		$(F90) -o $@ $(OBJS) $(LIBS)
+all: coupled fluids_only
 
-clean:
-	rm -f $(PROG) $(OBJS) *.mod
+coupled:	coupled_neutronics_fluids.o $(OBJS)
+		$(F90) -o $@ coupled_neutronics_fluids.o $(OBJS) #$(LIBS)
+
+fluids_only:	fluids_only.o $(OBJS)
+		$(F90) -o $@ fluids_only.o $(OBJS) #$(LIBS)
+
+#%.o:	%.f90
+#	$(F90) -c $(F90FLAGS) $<
 
 .SUFFIXES: $(SUFFIXES) .f90
 
 .f90.o:
 	$(F90) $(F90FLAGS) -c $<
+
+clean:
+	rm -f coupled fluids_only $(OBJS) *.mod
