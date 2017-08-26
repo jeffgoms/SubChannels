@@ -113,7 +113,7 @@
          ! writes temp of water in the horizontal plane at the top
          call write_tw_top(NX, NY, NZ, NPHASE, TW) ! should merge this with the previous subroutine ;-)
          ! writes temp of fuel for cell 2,2,2
-         call write_tf(NX, NY, NZ, NR, TF)
+         call write_tf(NX, NY, NZ, NR, TF, ROD_RADIUS_NODES)
 
          print *, " "
          print *, "WARNING***********************************************************************"

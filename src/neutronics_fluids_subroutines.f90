@@ -1632,7 +1632,7 @@
              J=NY-1 ! Include the potential bcs:
              RHSY(J) = RHSY(J) -MATRIX_NO_H(2,2,I,J,K,G)*PSI(I,J+1,K,G) 
 ! Tri-diagonal solver: 
-             CALL tridag(MATRIX_NO_H(1,2,I,2:NY-1,K,G), MATRIX_NO_H_DIAG(I,2:NY-1,K,G) + H(I,2:NY-1,K,G,G), MATRIX_NO_H(2,2,I,:,K,G), RHSY(2:NY-1), NY-2)
+             CALL tridag(MATRIX_NO_H(1,2,I,2:NY-1,K,G), MATRIX_NO_H_DIAG(I,2:NY-1,K,G) + H(I,2:NY-1,K,G,G), MATRIX_NO_H(2,2,I,2:NY-1,K,G), RHSY(2:NY-1), NY-2)
              ERROR=MAX( MAXVAL(ABS(PSI(I,2:NY-1,K,G) - RHSY(2:NY-1)) ), ERROR)
              PSI(I,2:NY-1,K,G) = RHSY(2:NY-1) 
           END DO
@@ -1917,7 +1917,7 @@ print *, 'error_g', error, 'its_g', its_g
              J=NY-1 ! Include the potential bcs:
              RHSY(J) = RHSY(J) -MATRIX_NO_H(2,2,I,J,K,G)*PSI(I,J+1,K,G) 
 ! Tri-diagonal solver: 
-             CALL tridag(MATRIX_NO_H(1,2,I,2:NY-1,K,G), MATRIX_NO_H_DIAG(I,2:NY-1,K,G) + H_DIAG(I,2:NY-1,K,G), MATRIX_NO_H(2,2,I,:,K,G), RHSY(2:NY-1), NY-2)
+             CALL tridag(MATRIX_NO_H(1,2,I,2:NY-1,K,G), MATRIX_NO_H_DIAG(I,2:NY-1,K,G) + H_DIAG(I,2:NY-1,K,G), MATRIX_NO_H(2,2,I,2:NY-1,K,G), RHSY(2:NY-1), NY-2)
              ERROR=MAX( MAXVAL(ABS(PSI(I,2:NY-1,K,G) - RHSY(2:NY-1)) ), ERROR)
              PSI(I,2:NY-1,K,G) = RHSY(2:NY-1) 
           END DO
@@ -2175,10 +2175,11 @@ print *, 'error_g', error, 'its_g', its_g
          close(io)
      end subroutine  write_tw_top
 
-     subroutine write_tf(NX, NY, NZ, NR, TF)
+     subroutine write_tf(NX, NY, NZ, NR, TF, ROD_RADIUS_NODES)
          implicit none
          integer, intent(in) :: NX, NY, NZ, NR
-         real, intent(in)    :: TF(NX,NY,NZ,NR) 
+         real, intent(in)    :: TF(NX,NY,NZ,NR)
+         real, intent(in)    :: ROD_RADIUS_NODES(NR+1)
          integer i, j, k, io, IR
 
          io = 143
@@ -2189,8 +2190,9 @@ print *, 'error_g', error, 'its_g', its_g
          write(io,*) "#  "
          write(143,*) "# radial node , value for cell i=2,j=2,k=2"
          i = 2; j = 2; k = 2
-         do IR=1,NR+1
-             write(143,'(i8, f16.4)') IR, tf(i,j,k,IR)        
+         do IR=2,NR-1 ! omit halo elements / nodes
+             write(143,'(2f16.4)') ROD_RADIUS_NODES(IR),   tf(i,j,k,IR)        
+             write(143,'(2f16.4)') ROD_RADIUS_NODES(IR+1), tf(i,j,k,IR)        
          enddo
          close(143)
 
