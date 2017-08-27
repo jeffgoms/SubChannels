@@ -501,9 +501,9 @@
         print *, "sigma_W", SIGMA_W
 
 ! Add in the vertical velocity (In non-conservative form) as a diffusion term...
-        ALLOCATE(KAPPAW(2,3,NX,NY,NZ,NPHASE)); KAPPAW=0.0 ! set diffusion to zero until we have a model for this.
+        ALLOCATE(KAPPAW(2,3,NX+1,NY+1,NZ,NPHASE)); KAPPAW=0.0 ! set diffusion to zero until we have a model for this.
 
-        ALLOCATE(CONSERV_VERT_ADV(2,NX+1,NY+1,NZ+1,NPHASE),TW2(NX+1,NY+1,NZ+1,NPHASE))
+        ALLOCATE(CONSERV_VERT_ADV(2,NX+1,NY+1,NZ,NPHASE),TW2(NX+1,NY+1,NZ,NPHASE))
         DO ITS_NONLIN_TW = 1, MAX(1,NITS_NONLIN_TW)
            CONSERV_VERT_ADV=0.0
            DO K=2,NZ-1
@@ -536,30 +536,18 @@
         REAL, DIMENSION( NX,NY,NZ,NPHASE ), intent( in ) :: T
 ! local variables...
         REAL, DIMENSION( :,:, :,: ), allocatable :: T_RATIO
-        INTEGER :: I,J,K,IPHASE
-        REAL :: INCOME
+        INTEGER :: K
 ! 
         ALLOCATE(T_RATIO(NX,NY,NZ+1,NPHASE))
 ! Flux limiting...
-           CALL ONE_D_LIMIT(T_RATIO, VEL, T, NX,NY,NZ,NPHASE) ! Calculate T_RATIO used for limiting.
+        CALL ONE_D_LIMIT(T_RATIO, VEL, T, NX,NY,NZ,NPHASE) ! Calculate T_RATIO used for limiting.
 ! No flux limiting T_RATIO=1.0
 
-           DO IPHASE=1,NPHASE ! No of fluid phases
-           DO K=2,NZ-1
-           DO J=2,NY
-           DO I=2,NX
-              INCOME = 0.5*(SIGN(1.0, VEL(I,J,K+1,IPHASE) ) +1.0)
-! INCOME=1.0 Velocity pointing upwards - advection upwards through bottom of cell face.
-! INCOME=0.0 Velocity pointing downwards
-              CONSERV_VERT_ADV(1,I,J,K+1,IPHASE) = CONSERV_VERT_ADV(1,I,J,K+1,IPHASE)  &
-                               *(INCOME*T_RATIO(I,J,K,IPHASE) +(1.0-INCOME)*T_RATIO(I,J,K+1,IPHASE))
+        DO K=2,NZ-1 
+           CONSERV_VERT_ADV(1,:,:,K,:) = CONSERV_VERT_ADV(1,:,:,K,:)*T_RATIO(:,:,K,:) 
+           CONSERV_VERT_ADV(2,:,:,K,:) = CONSERV_VERT_ADV(2,:,:,K,:)*T_RATIO(:,:,K+1,:) 
+        END DO
 
-              CONSERV_VERT_ADV(2,I,J,K,IPHASE)= CONSERV_VERT_ADV(2,I,J,K,IPHASE) &
-                               *(INCOME*T_RATIO(I,J,K,IPHASE) +(1.0-INCOME)*T_RATIO(I,J,K+1,IPHASE))
-           END DO
-           END DO
-           END DO
-           END DO
         RETURN
         END SUBROUTINE AMEND_FOR_LIMITING_CONSERV_VERT_ADV
         
@@ -578,7 +566,7 @@
     REAL, DIMENSION( NX,NY,NZ+1,NG ), intent( in ) :: VEL
     REAL, DIMENSION( NX,NY,NZ,NG ), intent( in ) :: T
     ! Local variables
-    REAL, PARAMETER :: TOLER=1.0E-10, XI_LIMIT = 2.0
+    REAL, PARAMETER :: TOLER=1.0E-10, XI_LIMIT = 2.0 ! defines TVD curve on the NVD diagram. 
     REAL :: DENOIN,CTILIN,INCOME, DENOOU,CTILOU,FTILIN,FTILOU, T_LIMIT
     INTEGER :: I,J,K,G
 ! cell numbering for +ve vel:
@@ -622,8 +610,8 @@
           DENOOU = SIGN( MAX(ABS( T(I,J,K,G) - T(I,J,K+2,G) ), TOLER), T(I,J,K,G) - T(I,J,K+2,G) )
           CTILOU = ( T(I,J,K+1,G) - T(I,J,K+2,G) ) / DENOOU
 
-          FTILIN = ( 0.5*(T(I,J,K,G)+T(I,J,K+1,G)) - T(I,J,K,G) ) / DENOIN ! the mean with 0.5 coeff is the high order value of T. 
-          FTILOU = ( 0.5*(T(I,J,K,G)+T(I,J,K+1,G)) - T(I,J,K,G) ) / DENOOU
+          FTILIN = ( 0.5*(T(I,J,K,G)+T(I,J,K+1,G)) - T(I,J,K-1,G) ) / DENOIN ! the mean with 0.5 coeff is the high order value of T. 
+          FTILOU = ( 0.5*(T(I,J,K,G)+T(I,J,K+1,G)) - T(I,J,K+2,G) ) / DENOOU
 
 ! Velocity is going out of element
           T_LIMIT =         INCOME   * ( T(I,J,K-1,G) + MAX(  MIN(FTILIN, XI_LIMIT*CTILIN, 1.0), CTILIN) * DENOIN ) &
@@ -675,7 +663,7 @@
 
         RADIUS=ROD_RADIUS_NODES(NR) ! Radius of control rod.
 
-        DO K=1,NZ ! Calc mean rod velocity...
+        DO K=2,NZ-1 ! Calc mean rod velocity...
            VEL_ROD_MEAN(:,:,K,:) = 0.5*(VEL(:,:,K,:)+VEL(:,:,K+1,:))
         END DO
         IF(NPHASE==1) THEN ! Just water - Units in cm and g
