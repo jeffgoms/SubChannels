@@ -59,10 +59,10 @@
         DIFF_FUEL_RODS=1. ! low
         S_FUEL_RODS=21000000.0 ! SOURCE OF ENERGY W/CM3
          
-        TF_RELAX=3 ! SWITCH ON TRI-DIAGONAL SOLVE
+        TF_RELAX=2 ! SWITCH ON TRI-DIAGONAL SOLVE
         TF_MAX_ITS=100
         TF_ERROR_TOLER=1.E-7
-        TW_RELAX=2
+        TW_RELAX=1
         TW_MAX_ITS=100
         TW_ERROR_TOLER=1.E-7
 
@@ -114,6 +114,8 @@
          call write_tw_top(NX, NY, NZ, NPHASE, TW) ! should merge this with the previous subroutine ;-)
          ! writes temp of fuel for cell 2,2,2
          call write_tf(NX, NY, NZ, NR, TF, ROD_RADIUS_NODES)
+
+         call write_tw_height(NX, NY, NZ, NPHASE, TW)
 
          print *, " "
          print *, "WARNING***********************************************************************"

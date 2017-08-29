@@ -447,7 +447,7 @@
         CALL CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX,NY,NZ,NPHASE)
         VOL_DEN_CP_WATER=VOLFRA*DEN_WATER*CP_WATER
 
-! Calculate SIGMA_W & SIGMA_ROD for both water and fuel rods...
+! Calculate SIGMA_W & SIGMA_ROD for both water and fuel rods...depends on the average velocity
 ! *************************************************
         ALLOCATE(SIGMA_W(NX+1,NY+1,NZ,NPHASE), SIGMA_ROD(NX+1,NY+1,NZ,NPHASE)) 
 
@@ -455,7 +455,6 @@
 
         print *, 'calling CALC_SIGMA_ROD_WATER'  
         CALL CALC_SIGMA_ROD_WATER( SIGMA_W, SIGMA_ROD, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NPHASE,NR )
-        print *, 'return from CALC_SIGMA_ROD_WATER'
 
 ! **********************************************************************************
 ! Apply bcs to TW and other fields at top and bottom ******************************* 
@@ -1465,6 +1464,8 @@
        ELSE ! just the diagonal
           R_RELAX=0.0
        ENDIF
+!        print *,'CONSERV_VERT_ADV:',CONSERV_VERT_ADV
+!        pause
 
 ! form more efficient matrix...
        DO G=1,NG ! No of energy groups
@@ -1474,13 +1475,22 @@
        DO I=2,NX-1
 ! Matrix vector...
           MATRIX_NO_H(1:2,1:3,I,J,K,G) = - KAPPA(1:2,1:3,I,J,K,G) 
-          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) +   0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G)
+
+! the below is correct but hardwired
+!          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) -   CONSERV_VERT_ADV(1,I,J,K,G)
+!          MATRIX_NO_H(2,3,I,J,K,G) = MATRIX_NO_H(2,3,I,J,K,G) +   0.0 * CONSERV_VERT_ADV(2,I,J,K,G)
+!          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) + 0.0 * CONSERV_VERT_ADV(1,I,J,K,G) &
+!                                                                    + 1.0 * CONSERV_VERT_ADV(2,I,J,K,G) 
+
+! the -ve represents the normal
+          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) -   0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G)
           MATRIX_NO_H(2,3,I,J,K,G) = MATRIX_NO_H(2,3,I,J,K,G) +   0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
-          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) + 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G) &
-                                                                    + 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
-!          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) +   MAX(CONSERV_VERT_ADV(1,I,J,K,G),0.0)
+          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) - 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G) &
+                                                                    + 0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
+
+!          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) -   MAX(CONSERV_VERT_ADV(1,I,J,K,G),0.0)
 !          MATRIX_NO_H(2,3,I,J,K,G) = MATRIX_NO_H(2,3,I,J,K,G) +   MIN(CONSERV_VERT_ADV(2,I,J,K,G),0.0)
-!          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) + MIN(CONSERV_VERT_ADV(1,I,J,K,G),0.0)+ MAX(CONSERV_VERT_ADV(2,I,J,K,G),0.0)
+!          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) - MIN(CONSERV_VERT_ADV(1,I,J,K,G),0.0)+ MAX(CONSERV_VERT_ADV(2,I,J,K,G),0.0)
        END DO
        END DO
        END DO
@@ -1803,10 +1813,12 @@ print *, 'error_g', error, 'its_g', its_g
        DO I=2,NX-1
 ! Matrix vector...
           MATRIX_NO_H(1:2,1:3,I,J,K,G) = - KAPPA(1:2,1:3,I,J,K,G) 
-          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) +   0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G)
+! the -ve represents the normal
+          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) -   0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G)
           MATRIX_NO_H(2,3,I,J,K,G) = MATRIX_NO_H(2,3,I,J,K,G) +   0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
-          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) + 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G) &
-                                                                    + 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
+          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) - 0.5*(1.0-SIGN(1.0,CONSERV_VERT_ADV_SIGN(1,I,J,K,G))) * CONSERV_VERT_ADV(1,I,J,K,G) &
+                                                                    + 0.5*(1.0+SIGN(1.0,CONSERV_VERT_ADV_SIGN(2,I,J,K,G))) * CONSERV_VERT_ADV(2,I,J,K,G)
+
 !          MATRIX_NO_H(1,3,I,J,K,G) = MATRIX_NO_H(1,3,I,J,K,G) +   MAX(CONSERV_VERT_ADV(1,I,J,K,G),0.0)
 !          MATRIX_NO_H(2,3,I,J,K,G) = MATRIX_NO_H(2,3,I,J,K,G) +   MIN(CONSERV_VERT_ADV(2,I,J,K,G),0.0)
 !          MATRIX_NO_H_DIAG(I,J,K,G) = SUM( KAPPA(1:2,1:3,I,J,K,G) ) + MIN(CONSERV_VERT_ADV(1,I,J,K,G),0.0)+ MAX(CONSERV_VERT_ADV(2,I,J,K,G),0.0)
@@ -2120,7 +2132,7 @@ print *, 'error_g', error, 'its_g', its_g
 
          io = 143
          open(io, file='water-temp_btm.dat')
-         k=1
+         k=2
          write(io,*) "# to plot this at a terminal type... "
          write(io,*) "# gnuplot "
          write(io,*) "# set pm3d map "
@@ -2129,10 +2141,10 @@ print *, 'error_g', error, 'its_g', its_g
          do i=1,NX
          do j=1,NY
          do iphase=1,NPHASE
-             write(io,'(3i8,f16.4)') i, j, iphase, tw(i,j,k,iphase)        
+             write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
          enddo
          enddo
-         write(io,'(3i8,f16.4)')
+         write(io,'(3i8,g16.4)')
          enddo
          close(io)
      end subroutine  write_tw_btm
@@ -2145,7 +2157,7 @@ print *, 'error_g', error, 'its_g', its_g
 
          io = 143
          open(io, file='water-temp_top.dat')
-         k=NZ
+         k=NZ-1
          write(io,*) "# to plot this at a terminal type... "
          write(io,*) "# gnuplot "
          write(io,*) "# set pm3d map "
@@ -2155,13 +2167,36 @@ print *, 'error_g', error, 'its_g', its_g
          do i=1,NX
          do j=1,NY
          do iphase=1,NPHASE
-             write(io,'(3i8,f16.4)') i, j, iphase, tw(i,j,k,iphase)        
+             write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
          enddo
          enddo
-         write(io,'(3i8,f16.4)')
+         write(io,'(3i8,g16.4)')
          enddo
          close(io)
      end subroutine  write_tw_top
+
+      subroutine  write_tw_height(NX, NY, NZ, NPHASE, TW)
+         implicit none
+         integer, intent(in) :: NX, NY, NZ, NPHASE
+         real, intent(in)    :: TW(NX+1,NY+1,NZ,NPHASE) 
+         integer i, j, k, iphase,  io
+
+         io = 143
+         open(io, file='water-temp-height.dat')
+!         write(io,*) "# to plot this at a terminal type... "
+!         write(io,*) "# gnuplot "
+!         write(io,*) "# plot './water-temp-height.dat' with linesp "
+!         write(io,*) "# "
+!         write(io,*) "# k value"
+         i=2
+         j=2
+         iphase = 1
+         do k=1,NZ
+         write(io,'(i8,g16.4)') k, tw(i,j,k,iphase)        
+         enddo
+
+         close(io)
+     end subroutine  write_tw_height
 
      subroutine write_tf(NX, NY, NZ, NR, TF, ROD_RADIUS_NODES)
          implicit none
@@ -2179,12 +2214,13 @@ print *, 'error_g', error, 'its_g', its_g
          write(143,*) "# radial node , value for cell i=2,j=2,k=2"
          i = 2; j = 2; k = 2
          do IR=2,NR-1 ! omit halo elements / nodes
-             write(143,'(2f16.4)') ROD_RADIUS_NODES(IR),   tf(i,j,k,IR)        
-             write(143,'(2f16.4)') ROD_RADIUS_NODES(IR+1), tf(i,j,k,IR)        
+             write(143,'(2g16.4)') ROD_RADIUS_NODES(IR),   tf(i,j,k,IR)        
+             write(143,'(2g16.4)') ROD_RADIUS_NODES(IR+1), tf(i,j,k,IR)        
          enddo
          close(143)
 
       end subroutine write_tf
+
 
 !         call write_water_temp()
 !         open(143, file='water-temp.dat')
