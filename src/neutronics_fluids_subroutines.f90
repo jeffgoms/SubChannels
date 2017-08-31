@@ -990,18 +990,38 @@
 
 
         SUBROUTINE DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX,NY,NZ,NPHASE)
-! Use steam tables from FETCH to calculate DEN_WATER,D_DEN_D_P
-! DEN_WATER=water density of all the phases
-! D_DEN_D_P=derivative of density w.r.t. pressure.
-         IMPLICIT NONE
-         INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
-         REAL, intent( in ) :: DEN_WATER(NX+1,NY+1,NZ,NPHASE), TW(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: D_DEN_D_P(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-! Local variables...
-         REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_CV
-         INTEGER :: I,J,K,IPHASE
+          ! Use steam tables from FETCH to calculate DEN_WATER,D_DEN_D_P
+          ! DEN_WATER=water density of all the phases
+          ! D_DEN_D_P=derivative of density w.r.t. pressure.
+          use steam_nrs_module
+          IMPLICIT NONE
+          INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
+          REAL, intent( in ) ::  TW(NX+1,NY+1,NZ,NPHASE), P(NX+1,NY+1,NZ)
+          REAL, intent( inout ) :: D_DEN_D_P(NX+1,NY+1,NZ,NPHASE), DEN_WATER(NX+1,NY+1,NZ,NPHASE)
+          ! Local variables...
+          REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_CV
+          INTEGER :: I,J,K,IPHASE
+          real :: dummy, dpdrho_vap, dpdrho_liq
 
-        RETURN
+          do i = 1, nx+1
+             do j = 1, ny+1
+                do k = 1, nz+1
+                   do iphase = 1, nphase
+                      call STEAM_NRS( P(i,j,k), TW(i,j,k,iphase),  &
+                           dummy, dummy, dummy, dummy, &
+                           den_water(i,j,k,1), den_water(i,j,k,2), &
+                           dummy, dummy, &
+                           dpdrho_vap, dpdrho_liq )
+                      d_den_d_p(i,j,k,1) = 1./dpdrho_vap 
+                      d_den_d_p(i,j,k,2) = 1./dpdrho_liq
+                      print*, P(i,j,k), TW(i,j,k,iphase), d_den_d_p(i,j,k,1), d_den_d_p(i,j,k,2)
+                   end do
+                end do
+             end do
+          end do
+          stop 8779
+
+          RETURN
         END SUBROUTINE DEN_FUNCTION_WATER
 
 

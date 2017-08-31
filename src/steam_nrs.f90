@@ -34,14 +34,19 @@ module steam_nrs_module
   contains
 
     SUBROUTINE STEAM_NRS( Pressure, Temperature,  &
-         Density_Phase, DPDRHO, LatentHeat, Cp )
+         Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
+         Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, &
+         DPDRHO_Vap, DPDRHO_Liq )
 
       implicit none
       real, intent(in) :: Pressure, Temperature
-      real, intent(inout) :: Density_Phase, DPDRHO, LatentHeat, Cp
+      real, intent(inout) :: Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
+           Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, DPDRHO_Vap, DPDRHO_Liq
 
       call outvolume( Pressure, Temperature, &
-           Density_Phase, DPDRHO, LatentHeat, Cp )
+           Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
+           Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, &
+           DPDRHO_Vap, DPDRHO_Liq )
       !! Units:
       !!   Pressure: g/(cm.s2)
       !!   Temperature: degree C
@@ -53,7 +58,9 @@ module steam_nrs_module
       return
     end subroutine STEAM_NRS
 
-    subroutine outvolume(p, t, rho, dpdr, hfg, Cp )
+    subroutine outvolume(p, t, rho, dpdr, hfg, Cp, &
+        rhov, rhol, Cp_Vap, Cp_Liq, &
+           DPDRHO_Vap, DPDRHO_Liq )
       !
       !*******************************************************************************
       !
@@ -67,7 +74,7 @@ module steam_nrs_module
       real dvdr, dvdt
       integer i, j
       real pmpa, rhostart, tk, v, rhol, rhov, xv, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cv, DPDT, GibbsEnergy, pressure, Entropy, InternalEnergy
-      real Enthalpy, Enthalpy_Liq, Enthalpy_Vap, Cp_Vap, Cp_Liq
+      real Enthalpy, Enthalpy_Liq, Enthalpy_Vap, Cp_Vap, Cp_Liq, DPDRHO_Vap, DPDRHO_Liq
 
 !!! Units conversion:
 !!!   1. Pressure:
@@ -85,8 +92,8 @@ module steam_nrs_module
 
 !!! Calculating the steam quality
       call tsat( pp, tsatur, rhol, rhov )
-      call therm( tt, rhol, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Liq, Cv, DPDRHO, DPDT, GibbsEnergy, Enthalpy_Liq, pressure, Entropy, InternalEnergy )
-      call therm( tt, rhov, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Vap, Cv, DPDRHO, DPDT, GibbsEnergy, Enthalpy_Vap, pressure, Entropy, InternalEnergy )
+      call therm( tt, rhol, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Liq, Cv, DPDRHO_Liq, DPDT, GibbsEnergy, Enthalpy_Liq, pressure, Entropy, InternalEnergy )
+      call therm( tt, rhov, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Vap, Cv, DPDRHO_Vap, DPDT, GibbsEnergy, Enthalpy_Vap, pressure, Entropy, InternalEnergy )
 
       if (tt <= tsatur - 5.) then
          xv = 0.
