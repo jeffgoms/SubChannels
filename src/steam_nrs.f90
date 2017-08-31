@@ -33,37 +33,41 @@ module steam_nrs_module
 
   contains
 
-SUBROUTINE STEAM_NRS(P,T,DENSTF)
- 
-  implicit none
-  real t,p,denstf
+    SUBROUTINE STEAM_NRS( Pressure, Temperature,  &
+         Density_Phase, DPDRHO, LatentHeat, Cp )
 
-  call outvolume(t,p,denstf)
-  
-return
-end subroutine
+      implicit none
+      real, intent(in) :: Pressure, Temperature
+      real, intent(inout) :: Density_Phase, DPDRHO, LatentHeat, Cp
 
-subroutine outvolume(t,p,rho)
-  !
-  !*******************************************************************************
-  !
-  !! outvolume tests VOLUME.
-  !
-  !
-  real dpdr
-  real dvdr
-  real dvdt
-  integer i
-  integer j
-  real pmpa
-  real rho
-  real rhostart
-  real tk
-  real v
+      call outvolume( Pressure, Temperature, &
+           Density_Phase, DPDRHO, LatentHeat, Cp )
+      !! Units:
+      !!   Pressure: g/(cm.s2)
+      !!   Temperature: degree C
+      !!   DPDRHO: MPa*cm3/g
+      !!   Density_Phase: g/cm3
+      !!   LatentHeat: J/g
+      !!   Cp: J/(g.K)
 
-  real p, t
-  real pp, tt, tsatur
-  real rhol, rhov, xv
+      return
+    end subroutine STEAM_NRS
+
+    subroutine outvolume(p, t, rho, dpdr, hfg, Cp )
+      !
+      !*******************************************************************************
+      !
+      !! outvolume tests VOLUME.
+      !
+      !
+      real p, t
+      real rho, DPDRHO, hfg, Cp
+
+      real pp, tt, tsatur, dpdr
+      real dvdr, dvdt
+      integer i, j
+      real pmpa, rhostart, tk, v, rhol, rhov, xv, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cv, DPDT, GibbsEnergy, pressure, Entropy, InternalEnergy
+      real Enthalpy, Enthalpy_Liq, Enthalpy_Vap, Cp_Vap, Cp_Liq
 
 !!! Units conversion:
 !!!   1. Pressure:
@@ -71,24 +75,36 @@ subroutine outvolume(t,p,rho)
 !!!   2. Temperature:
 !!!       Input: degree C   --> Output: K
 
-  tt = t + 273.15
-  pp = p * 1.e-7
-  rhostart = 1.9 ; rhol = rhostart ; rhov = rhostart/1000. ! Initialisation of density
+      tt = t + 273.15
+      pp = p * 1.e-7
+      rhostart = 5.9 ; rhol = rhostart ; rhov = rhostart/1000. ! Initialisation of density
 
-  call dense(pp,tt,rhostart, rho, dpdr )
-  call calc_volume(tt,rho,v,dvdt,dvdr)
-  call tsat( pp, tsatur, rhol, rhov )
-  print*, 'Tsat:', tsatur
-  !print*, 'rhol, rhov:', 1./rhol, 1./rhov
+      call dense(pp,tt,rhostart, rho, dpdr )
+      call calc_volume(tt,rho,v,dvdt,dvdr)
+      call calchfg(hfg,pp)
 
 !!! Calculating the steam quality
-   xv = min( 1., max( 0., (rho - rhol)/(rhov-rhol) ) )
-   print*, xv, rho, rhol, rhov
-   print*, xv*rhov, (1.-xv)*rhol
+      call tsat( pp, tsatur, rhol, rhov )
+      call therm( tt, rhol, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Liq, Cv, DPDRHO, DPDT, GibbsEnergy, Enthalpy_Liq, pressure, Entropy, InternalEnergy )
+      call therm( tt, rhov, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp_Vap, Cv, DPDRHO, DPDT, GibbsEnergy, Enthalpy_Vap, pressure, Entropy, InternalEnergy )
+
+      if (tt <= tsatur - 5.) then
+         xv = 0.
+      elseif( tt >= tsatur + 5. ) then
+         xv = 1.
+      else
+         Enthalpy = sigoi(tsatur, tt, 5., Enthalpy_Liq, Enthalpy_Vap)
+         xv = min( 1., max( 0., (Enthalpy - Enthalpy_Liq)/(Enthalpy_Vap-Enthalpy_Liq) ) )
+      endif
+      rho = xv * rhov + (1. - xv) * rhol
 
 
-  return
-end subroutine outvolume
+      call therm( tt, rho, HelmholtzEnergy, JouleThompson_Isoth, JouleThompson_Isob, Cp, Cv, DPDRHO, DPDT, GibbsEnergy, Enthalpy, pressure, Entropy, InternalEnergy )
+      Cp =  xv * Cp_Vap + (1. - xv) * Cp_Liq
+
+
+      return
+    end subroutine outvolume
 
 
 
