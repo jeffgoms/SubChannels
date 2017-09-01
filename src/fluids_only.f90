@@ -48,18 +48,22 @@
 
 ! UNITS IN cm and g
       
-        DX(1)=2.0 ! SIZE OF ROD CENTRED CELL IN X DIRECTION
+        DX(1)=0.02 ! SIZE OF ROD CENTRED CELL IN X DIRECTION
         DX(2)=DX(1)
-        DX(3)= 5.0! SIZE OF ROD CENTRED CELL IN Z-DIRECTION
+        DX(3)= 0.05! SIZE OF ROD CENTRED CELL IN Z-DIRECTION
         VOLFRA=1.0;VOLFRAOLD=1.0
-        VEL=100.0; VELOLD=VEL ! Vel of water in cm/s
-        DEN_WATER=1.0; den_water_old=den_water
-        DEN_WATER_BCS=1.0
-        DEN_CP_FUEL_RODS=10.
-        DIFF_FUEL_RODS=1. ! low
-        S_FUEL_RODS=21000000.0 ! SOURCE OF ENERGY W/CM3
+!        VEL=100.0; VELOLD=VEL ! Vel of water in m/s
+        VEL=1.0; VELOLD=VEL ! Vel of water in m/s
+        DEN_WATER=1.0e+3; den_water_old=den_water
+        DEN_WATER_BCS=1.0e+3
+        DEN_CP_FUEL_RODS=10.0e+3
+        DIFF_FUEL_RODS=1.0e+2 ! conductitivity of fuel rods
+!        DIFF_FUEL_RODS=1.0 ! conductitivity of fuel rods
+!        S_FUEL_RODS=21000000.0 ! SOURCE OF ENERGY W/CM3
+        S_FUEL_RODS=21.0 ! SOURCE OF ENERGY W/M3
+!        S_FUEL_RODS=0.0 ! SOURCE OF ENERGY W/M3
          
-        TF_RELAX=2 ! SWITCH ON TRI-DIAGONAL SOLVE
+        TF_RELAX=1 ! SWITCH ON TRI-DIAGONAL SOLVE
         TF_MAX_ITS=100
         TF_ERROR_TOLER=1.E-7
         TW_RELAX=1
@@ -75,7 +79,7 @@
          P_BCS=0.0
          TW_BCS=200.0 ! SET INLET TEMP BC
          !ROD_RADIUS_NODES ! NODE POSITIONS IN THE R-DIRECTION
-         ROD_RADIUS = 0.7
+         ROD_RADIUS = 0.007
          ROD_RADIUS_NODES(1:2)=0.0
          DO I=3,NR
            ROD_RADIUS_NODES(I) = REAL(I-2)*ROD_RADIUS/REAL(NR-2)
