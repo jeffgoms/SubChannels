@@ -198,6 +198,7 @@
         REAL, intent( in ) :: BETA_EFF
         INTEGER, intent( in ) :: NTIME
 ! Local variables...
+        REAL, PARAMETER :: R_CONVERT_XSECS_2SI = 0.01 ! Used to convert x-sections in cm to m to be consisitent with SI fluids code. 
         REAL, DIMENSION( :, :, :, : ), allocatable :: TWF_FOR_INTERPOLATION
         REAL, DIMENSION( : ), allocatable :: MID_RADIUS
         REAL :: ONEIN(NDIM_INTERP,2)
@@ -256,12 +257,12 @@
 
               R_WEIGHT= ONEIN(1,IP+1) * ONEIN(2,JP+1) * ONEIN(3,KP+1) * ONEIN(4,MP+1)
 
-              NEUTRON_DIFF(I,J,K,:)= NEUTRON_DIFF(I,J,K,:)  +  R_WEIGHT * NEUTRON_DIFF_TEMPERATURE(:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) 
-              SIGMA_MATRIX(I,J,K,:,:) = SIGMA_MATRIX(I,J,K,:,:) + R_WEIGHT * SIGMA_S_TEMPERATURE(:,:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP)
+              NEUTRON_DIFF(I,J,K,:)= NEUTRON_DIFF(I,J,K,:)  +  R_WEIGHT * NEUTRON_DIFF_TEMPERATURE(:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP)  /  R_CONVERT_XSECS_2SI ! dimensions of diffusion is metres
+              SIGMA_MATRIX(I,J,K,:,:) = SIGMA_MATRIX(I,J,K,:,:) + R_WEIGHT * SIGMA_S_TEMPERATURE(:,:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) * R_CONVERT_XSECS_2SI
               DO G=1,NG
-                 SIGMA_MATRIX(I,J,K,G,G) = SIGMA_MATRIX(I,J,K,G,G) + R_WEIGHT * SIGMA_A_TEMPERATURE(G,IMAT,II+IP,JJ+JP,KK+KP,MM+MP)
+                 SIGMA_MATRIX(I,J,K,G,G) = SIGMA_MATRIX(I,J,K,G,G) + R_WEIGHT * SIGMA_A_TEMPERATURE(G,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) * R_CONVERT_XSECS_2SI
               END DO
-              SIGMA_F(I,J,K,:) = SIGMA_F(I,J,K,:) + R_WEIGHT * SIGMA_F_TEMPERATURE(:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) 
+              SIGMA_F(I,J,K,:) = SIGMA_F(I,J,K,:) + R_WEIGHT * SIGMA_F_TEMPERATURE(:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) * R_CONVERT_XSECS_2SI
 
 ! Prompt fission spectrum...
               XI_P(I,J,K,:)= XI_P(I,J,K,:) + R_WEIGHT * XI_P_TEMPERATURE(:,IMAT,II+IP,JJ+JP,KK+KP,MM+MP) 
@@ -636,7 +637,8 @@
         REAL, intent( inout ) :: CP_WATER(NX+1,NY+1,NZ,NPHASE)
         
         IF(NPHASE==1) THEN ! Just water
-            CP_WATER=4.2 ! Units in cm and g.
+!            CP_WATER=4.2 ! Units in cm and g.
+            CP_WATER=4.2e+3 ! Units in m and kg.
         ELSE
         ENDIF
 
@@ -668,8 +670,8 @@
         IF(NPHASE==1) THEN ! Just water - Units in cm and g
            Pr = 7.0 ! Pradle no of water
            k_w =  0.6 ! conductivity of water (W/(mK)) thus 0.6 W/(mK) becomes 0.6*0.01 W/(cm K)
-!           KINEMATIC_VISC_WATER = 1.E-6 ! Water kinematic viscocity m^2/s
-           KINEMATIC_VISC_WATER = 1.E-2 ! Water kinematic viscocity cm^2/s
+           KINEMATIC_VISC_WATER = 1.E-6 ! Water kinematic viscocity m^2/s
+!           KINEMATIC_VISC_WATER = 1.E-2 ! Water kinematic viscocity cm^2/s
            SIGMA_W = 0.0
            SIGMA_ROD = 0.0
            RADIUS = ROD_RADIUS_NODES(NR) 
@@ -677,9 +679,10 @@
            DO K=2,NZ-1
            DO J=2,NY-1
            DO I=2,NX-1
-              Re= VEL_ROD_MEAN(I,J,K,IPHASE)*0.01 * RADIUS*0.01/  KINEMATIC_VISC_WATER
+!              Re= VEL_ROD_MEAN(I,J,K,IPHASE)*0.01 * RADIUS*0.01/  KINEMATIC_VISC_WATER
+              Re= VEL_ROD_MEAN(I,J,K,IPHASE)* RADIUS/  KINEMATIC_VISC_WATER
               NU_D = 0.332* Re**0.5 *Pr**0.3333333 ! Nusselt no. 
-              H_WR= ((k_w*0.01)/(RADIUS*0.01))*NU_D ! heat transfer coefficient. 
+              H_WR= (k_w/RADIUS)*NU_D ! heat transfer coefficient. 
               SIGMA_W(I,J,K,IPHASE) = 2.0*PI*RADIUS*H_WR/(DX(1)*DX(2)) ! Volumetric heat tranfer coeff - adjusted for discretization of water temp. 
 !              SIGMA_W(I,J,K,IPHASE) = 100000.0!*2.0*PI*RADIUS*H_WR/(DX(1)*DX(2))
               !print *, "sigma_w", 2.0*PI*RADIUS*H_WR/(DX(1)*DX(2)) 
@@ -735,7 +738,8 @@
 ! VEL_ERROR_TOLER = error tolerence for convergence mas=x difference between temps from 2 consecutive iterations. 
 ! Similarly for other solver options VOLFRA_RELAX. 
          IMPLICIT NONE
-         REAL, PARAMETER :: GRAVTY = 9800.0 ! In units of cm,g 
+!         REAL, PARAMETER :: GRAVTY = 9800.0 ! In units of cm,g 
+         REAL, PARAMETER :: GRAVTY = 9.8 ! In units of m, kg 
          INTEGER, PARAMETER :: NITS_NONLIN_VOLFRA = 0 ! =0 no limiting for volume fraction and otherwise = no of non-linear limiting iterations
          INTEGER, PARAMETER :: NITS_NONLIN_VEL = 0 ! =0 no limiting for velocity and otherwise = no of non-linear limiting iterations
          REAL, PARAMETER :: INFINY = 1.E+14 ! Used in the application of bcs using big sping. 
