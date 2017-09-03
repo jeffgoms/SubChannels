@@ -2,16 +2,18 @@
       
          implicit none
        INTEGER, PARAMETER :: NX=3,NY=3,NZ=10,NR=6,NPHASE=1
+!       INTEGER, PARAMETER :: NX=3,NY=3,NZ=62,NR=32,NPHASE=1
+       INTEGER, PARAMETER :: NX_WATER=NX+1,NY_WATER=NY+1,NZ_WATER=NZ
          INTEGER :: TF_MAX_ITS, TW_MAX_ITS, NSTEP_ITS
-         REAL :: DX(3),ROD_RADIUS_NODES(NR+1),ROD_RADIUS,DT
-         REAL :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX+1,NY+1,NZ,NPHASE),TWOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL :: VOLFRA(NX+1,NY+1,NZ,NPHASE),VOLFRAOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL :: DEN_WATER(NX+1,NY+1,NZ,NPHASE),DEN_WATER_OLD(NX+1,NY+1,NZ,NPHASE)
-         REAL :: P(NX+1,NY+1,NZ)
-         REAL :: VEL(NX+1,NY+1,NZ+1,NPHASE),VELOLD(NX+1,NY+1,NZ+1,NPHASE)
-         REAL :: TW_BCS(NX+1,NY+1,NZ,NPHASE), DEN_WATER_BCS(NX+1,NY+1,NZ,NPHASE) 
-         REAL :: VEL_BCS(NX+1,NY+1,NZ+1,NPHASE), VOLFRA_BCS(NX+1,NY+1,NZ,NPHASE), P_BCS(NX+1,NY+1,NZ,NPHASE)
-         INTEGER :: P_BCS_ON(NX+1,NY+1,NZ,NPHASE)
+         REAL :: DX(3),ROD_RADIUS_NODES(NX,NY,NZ,NR+1),ROD_RADIUS,DT
+         REAL :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),TWOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VOLFRAOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL :: DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER_OLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL :: P(NX_WATER,NY_WATER,NZ_WATER)
+         REAL :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE),VELOLD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         REAL :: TW_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), DEN_WATER_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
+         REAL :: VEL_BCS(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), VOLFRA_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), P_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         INTEGER :: P_BCS_ON(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
          REAL :: DEN_CP_FUEL_RODS(NX,NY,NZ,NR), DIFF_FUEL_RODS(NX,NY,NZ,NR)
          REAL :: TF_ERROR_TOLER,TW_ERROR_TOLER
          INTEGER :: TF_RELAX,TW_RELAX
@@ -63,7 +65,7 @@
         S_FUEL_RODS=21.0 ! SOURCE OF ENERGY W/M3
 !        S_FUEL_RODS=0.0 ! SOURCE OF ENERGY W/M3
          
-        TF_RELAX=1 ! SWITCH ON TRI-DIAGONAL SOLVE
+        TF_RELAX=3 ! SWITCH ON TRI-DIAGONAL SOLVE
         TF_MAX_ITS=100
         TF_ERROR_TOLER=1.E-7
         TW_RELAX=1
@@ -80,11 +82,11 @@
          TW_BCS=200.0 ! SET INLET TEMP BC
          !ROD_RADIUS_NODES ! NODE POSITIONS IN THE R-DIRECTION
          ROD_RADIUS = 0.007
-         ROD_RADIUS_NODES(1:2)=0.0
+         ROD_RADIUS_NODES(:,:,:,1:2)=0.0
          DO I=3,NR
-           ROD_RADIUS_NODES(I) = REAL(I-2)*ROD_RADIUS/REAL(NR-2)
+           ROD_RADIUS_NODES(:,:,:,I) = REAL(I-2)*ROD_RADIUS/REAL(NR-2)
          ENDDO 
-         ROD_RADIUS_NODES(NR+1)=ROD_RADIUS_NODES(NR)
+         ROD_RADIUS_NODES(:,:,:,NR+1)=ROD_RADIUS_NODES(:,:,:,NR)
 
          DT=1.0 ! TIME STEP SIZE SECONDS
          NTIME = 50
@@ -99,7 +101,7 @@
 
         call TEMP_CALC(TF,TFOLD, TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P,VEL,VELOLD, &
                              TW_BCS, DEN_WATER_BCS, VEL_BCS, VOLFRA_BCS, P_BCS, P_BCS_ON, &
-                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
+                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
                              TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER, &
                              TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, &
                              VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, &
@@ -113,19 +115,15 @@
 
          ! some routines which output cell number and temperatures ... 
          ! writes temp of water in the horizontal plane at the bottom
-         call write_tw_btm(NX, NY, NZ, NPHASE, TW) 
+         call write_tw_btm(NX_WATER, NY_WATER, NZ_WATER, NPHASE, TW) 
+         ! writes temp of water in a line in the z-direction
+         call write_tw_height(NX_WATER, NY_WATER, NZ_WATER, NPHASE, TW) 
          ! writes temp of water in the horizontal plane at the top
-         call write_tw_top(NX, NY, NZ, NPHASE, TW) ! should merge this with the previous subroutine ;-)
+         call write_tw_top(NX_WATER, NY_WATER, NZ, NPHASE, TW) ! should merge this with the previous subroutine ;-)
          ! writes temp of fuel for cell 2,2,2
          call write_tf(NX, NY, NZ, NR, TF, ROD_RADIUS_NODES)
 
-         call write_tw_height(NX, NY, NZ, NPHASE, TW)
 
-         print *, " "
-         print *, "WARNING***********************************************************************"
-         print *, "SIGMA_W(I,J,K,IPHASE) currently overwritten in subroutine CALC_SIGMA_ROD_WATER"
-         print *, "WARNING***********************************************************************"
-         print *, " "
 
          print *, 'finished'
 

@@ -31,7 +31,7 @@
 
         SUBROUTINE NEUTRONICS_STEP(TF,TFOLD, TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P,VEL,VELOLD, &
                              TW_BCS, DEN_WATER_BCS, VEL_BCS, VOLFRA_BCS, P_BCS, P_BCS_ON, &
-                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NG,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, RADIAL_ROD_MATERIAL, &
+                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NG,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, RADIAL_ROD_MATERIAL, &
                              TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER, &
                              TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, &
                              PSI,PSIOLD,C,COLD,S_NEUTRONS,SPEED,NEUTRON_DIFF,SIGMA_MATRIX, NEU_RELAX,NEU_MAX_ITS,NEU_ERROR_TOLER,NEU_MAX_ITS_IN_G,NEU_ERROR_TOLER_IN_G, &
@@ -74,19 +74,19 @@
 ! Similarly for other solver options. 
          IMPLICIT NONE
          REAL, PARAMETER :: HEAT_PER_FISSION = 3.2E-11 ! Joules per fission event.
-         INTEGER, intent( in ) :: NX,NY,NZ,NG,NR,NDELAY,NPHASE, TF_MAX_ITS, TW_MAX_ITS, NSTEP_ITS
+         INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NG,NR,NDELAY,NPHASE, TF_MAX_ITS, TW_MAX_ITS, NSTEP_ITS
          REAL, intent( inout ) :: PSI(NX,NY,NZ,NG), C(NX,NY,NZ,NDELAY)
          REAL, intent( in ) :: PSIOLD(NX,NY,NZ,NG), COLD(NX,NY,NZ,NDELAY), S_NEUTRONS(NX,NY,NZ,NG)
-         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NR+1),DT
+         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NX,NY,NZ,NR+1),DT
          REAL, intent( inout ) :: SPEED(NG)
-         REAL, intent( inout ) :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX+1,NY+1,NZ,NPHASE),TWOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: VOLFRA(NX+1,NY+1,NZ,NPHASE),VOLFRAOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: DEN_WATER(NX+1,NY+1,NZ,NPHASE),DEN_WATER_OLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: P(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: VEL(NX+1,NY+1,NZ+1,NPHASE),VELOLD(NX+1,NY+1,NZ+1,NPHASE)
-         REAL, intent( in ) :: TW_BCS(NX+1,NY+1,NZ,NPHASE), DEN_WATER_BCS(NX+1,NY+1,NZ,NPHASE) 
-         REAL, intent( in ) :: VEL_BCS(NX+1,NY+1,NZ+1,NPHASE), VOLFRA_BCS(NX+1,NY+1,NZ,NPHASE), P_BCS(NX+1,NY+1,NZ,NPHASE)
-         INTEGER, intent( in ) :: P_BCS_ON(NX+1,NY+1,NZ,NPHASE)
+         REAL, intent( inout ) :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),TWOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VOLFRAOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER_OLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: P(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE),VELOLD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         REAL, intent( in ) :: TW_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), DEN_WATER_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
+         REAL, intent( in ) :: VEL_BCS(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), VOLFRA_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), P_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         INTEGER, intent( in ) :: P_BCS_ON(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
          REAL, intent( in ) :: DEN_CP_FUEL_RODS(NX,NY,NZ,NR), DIFF_FUEL_RODS(NX,NY,NZ,NR)
          INTEGER, intent( in ) :: RADIAL_ROD_MATERIAL(NX,NY,NZ,NR)
          REAL, intent( in ) :: TF_ERROR_TOLER,TW_ERROR_TOLER
@@ -126,7 +126,7 @@
                  RFISS(:) = REAL(MAX(2-RADIAL_ROD_MATERIAL(I,J,K,:),0))! Lets say that IMAT=1 is fissile fuel rods. 
                  RNORM=0.0
                  DO IR=2,NR-1
-                    R_WEIGHT=RFISS(I)*( ROD_RADIUS_NODES(I+1)**2 - ROD_RADIUS_NODES(I)**2 )
+                    R_WEIGHT=RFISS(I)*( ROD_RADIUS_NODES(I,J,K,IR+1)**2 - ROD_RADIUS_NODES(I,J,K,IR)**2 )
                     RNORM = RNORM + R_WEIGHT
                     S_FUEL_RODS(I,J,K,IR) = R_WEIGHT*POWER_PER_ROD
                  END DO
@@ -137,7 +137,7 @@
               END DO
            CALL TEMP_CALC(TF,TFOLD, TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P,VEL,VELOLD, &
                           TW_BCS, DEN_WATER_BCS, VEL_BCS, VOLFRA_BCS, P_BCS, P_BCS_ON, &
-                          DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
+                          DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
                           TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER, &
                           TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, &
                           VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, &
@@ -145,7 +145,7 @@
            ENDIF ! IF(TW_MAX_ITS.GT.0) THEN
 
            CALL INTERPOLATE_XSECTIONS_4D(TF,TW,VOLFRA,DEN_WATER,NEUTRON_DIFF,SIGMA_MATRIX,SIGMA_F_MATRIX,SIGMA_F, XI_P,XI_D,NU_F, ROD_RADIUS_NODES, &
-                            NX,NY,NZ,NG,NR,NDELAY,NPHASE, &
+                            NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NG,NR,NDELAY,NPHASE, &
                             INTERP_TEMPERATURE, NEUTRON_DIFF_TEMPERATURE,SIGMA_A_TEMPERATURE, SIGMA_S_TEMPERATURE, SIGMA_F_TEMPERATURE, &
                             XI_P_TEMPERATURE,XI_D_TEMPERATURE,NU_F_TEMPERATURE, MATERIAL,NMATERIAL, NX_T1,NX_T2, NX_T3,NX_T4, MAX_NX_TI, NDIM_INTERP, &
                             BETA_EFF, NTIME )
@@ -166,7 +166,7 @@
 
 
         SUBROUTINE INTERPOLATE_XSECTIONS_4D(TF,TW,VOLFRA,DEN_WATER,NEUTRON_DIFF,SIGMA_MATRIX,SIGMA_F_MATRIX,SIGMA_F, XI_P,XI_D,NU_F, ROD_RADIUS_NODES, &
-                            NX,NY,NZ,NG,NR,NDELAY,NPHASE, &
+                            NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NG,NR,NDELAY,NPHASE, &
                             INTERP_TEMPERATURE, NEUTRON_DIFF_TEMPERATURE,SIGMA_A_TEMPERATURE, SIGMA_S_TEMPERATURE, SIGMA_F_TEMPERATURE, &
                             XI_P_TEMPERATURE,XI_D_TEMPERATURE,NU_F_TEMPERATURE, MATERIAL,NMATERIAL, NX_T1,NX_T2, NX_T3,NX_T4, MAX_NX_TI, NDIM_INTERP, &
                             BETA_EFF, NTIME )
@@ -177,16 +177,17 @@
 ! ---central axies of rod temperature of fuel/control rod.  
 ! One could not use the last two, say, and set NX_T3=1,NX_T4=1.
 ! NX,NY,NZ,NG no of cells in x,y,z directions, Number of energy groups, 
+! NX_WATER,NY_WATER,NZ_WATER no of cells in x,y,z directions for water sub-channels.  
 ! NR=no of radial cells in fuel rods. 
 ! NDELAY=no of delayed neutrons
 ! NX_T1, NX_T2, NX_T3,NX_T4 are the 4D dimensions used for temperature interpolation of x-sections. 
         IMPLICIT NONE
-        INTEGER, intent( in ) :: NX,NY,NZ,NG,NR,NDELAY,NPHASE, NMATERIAL
-        REAL, intent( in ) :: TF(NX,NY,NZ,NR),TW(NX+1,NY+1,NZ,NPHASE),VOLFRA(NX+1,NY+1,NZ,NPHASE),DEN_WATER(NX+1,NY+1,NZ,NPHASE)
+        INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NG,NR,NDELAY,NPHASE, NMATERIAL
+        REAL, intent( in ) :: TF(NX,NY,NZ,NR),TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
         REAL, intent( inout ) :: NEUTRON_DIFF(NX,NY,NZ,NG)
         REAL, intent( inout ) :: SIGMA_MATRIX(NX,NY,NZ,NG,NG),SIGMA_F_MATRIX(NX,NY,NZ,NG,NG),SIGMA_F(NX,NY,NZ,NG)
         REAL, intent( inout ) :: XI_P(NX,NY,NZ,NG),XI_D(NX,NY,NZ,NG),NU_F(NX,NY,NZ,NG)
-        REAL, intent( in ) :: ROD_RADIUS_NODES(NR+1)
+        REAL, intent( in ) :: ROD_RADIUS_NODES(NX,NY,NZ,NR+1)
         INTEGER, intent( in ) :: NX_T1, NX_T2, NX_T3,NX_T4, MAX_NX_TI, NDIM_INTERP
         REAL, intent( in ) :: INTERP_TEMPERATURE(MAX_NX_TI,NDIM_INTERP )
         REAL, intent( in ) :: NEUTRON_DIFF_TEMPERATURE(NG,NMATERIAL,NX_T1,NX_T2, NX_T3,NX_T4)
@@ -200,24 +201,42 @@
 ! Local variables...
         REAL, PARAMETER :: R_CONVERT_XSECS_2SI = 0.01 ! Used to convert x-sections in cm to m to be consisitent with SI fluids code. 
         REAL, DIMENSION( :, :, :, : ), allocatable :: TWF_FOR_INTERPOLATION
-        REAL, DIMENSION( : ), allocatable :: MID_RADIUS
+        REAL, DIMENSION( :,:,:,: ), allocatable :: MID_RADIUS
         REAL :: ONEIN(NDIM_INTERP,2)
         INTEGER :: I,J,K,G,GD,IDIM, II,JJ,KK,MM, IR, IONLY_ONE(NDIM_INTERP), IMAT
         INTEGER :: IP,JP,KP,MP
-        REAL :: R_WEIGHT, RNORM, RBETA_EFF                            
+        REAL :: R_WEIGHT, RBETA_EFF                            
         INTEGER :: NX_TEMPERATURE(NDIM_INTERP), MAT(NDIM_INTERP)
 
-        ALLOCATE(TWF_FOR_INTERPOLATION(NX,NY,NZ,NDIM_INTERP), MID_RADIUS(NR) )
+        ALLOCATE(TWF_FOR_INTERPOLATION(NX,NY,NZ,NDIM_INTERP), MID_RADIUS(NX,NY,NZ,NR) )
         DO IR=1,NR
-           MID_RADIUS(IR)=0.5*(ROD_RADIUS_NODES(IR)+ROD_RADIUS_NODES(IR+1))
+           MID_RADIUS(:,:,:,IR)=0.5*(ROD_RADIUS_NODES(:,:,:,IR)+ROD_RADIUS_NODES(:,:,:,IR+1))
         END DO
 
-        RNORM = SUM(MID_RADIUS(:))
+        IF(NX+1.EQ.NX_WATER) THEN
+           DO K=2,NZ-1
+           DO J=2,NY-1
+           DO I=2,NX-1
+              TWF_FOR_INTERPOLATION(I,J,K,1) = 0.25*( TW(I,J,K,1) + TW(I+1,J,K,1) + TW(I,J+1,K,1) + TW(I+1,J+1,K,1) ) ! water temp
+           END DO
+           END DO
+           END DO
+        ELSE ! END OF IF(NX+1.EQ.NX_WATER) THEN ! New channel centred method for 4 channels around a fuel rod. 
+           DO K=2,NZ-1
+           DO J=2,NY-1
+           DO I=2,NX-1
+              II=(I-1)*2 
+              JJ=(J-1)*2 
+              TWF_FOR_INTERPOLATION(I,J,K,1) = 0.25*( TW(II,JJ,K,1) + TW(II+1,JJ,K,1) + TW(II,JJ+1,K,1) + TW(II+1,JJ+1,K,1) ) ! water temp
+           END DO
+           END DO
+           END DO
+        ENDIF ! END OF IF(NX+1.EQ.NX_WATER) THEN ELSE
+
         DO K=2,NZ-1
         DO J=2,NY-1
         DO I=2,NX-1
-           TWF_FOR_INTERPOLATION(I,J,K,1) = 0.25*( TW(I,J,K,1) + TW(I+1,J,K,1) + TW(I,J+1,K,1) + TW(I+1,J+1,K,1) ) ! water temp
-           TWF_FOR_INTERPOLATION(I,J,K,2) = SUM( TF(I,J,K,:)*MID_RADIUS(:) )/RNORM ! mean rod temp
+           TWF_FOR_INTERPOLATION(I,J,K,2) = SUM( TF(I,J,K,:)*MID_RADIUS(I,J,K,:) )/SUM(MID_RADIUS(I,J,K,:)) ! mean rod temp
            IF(NPHASE.GT.1) THEN
               TWF_FOR_INTERPOLATION(I,J,K,3) = 1.0-VOLFRA(I,J,K,1) ! ASSUME THE 1ST PHASE IS WATER (THIS IS VOID FRACTION)
               TWF_FOR_INTERPOLATION(I,J,K,4) = TF(I,J,K,1) ! central axies temperature of fuel/control rod. 
@@ -377,7 +396,7 @@
 
         SUBROUTINE TEMP_CALC(TF,TFOLD, TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P,VEL,VELOLD, &
                              TW_BCS, DEN_WATER_BCS, VEL_BCS, VOLFRA_BCS, P_BCS, P_BCS_ON, &
-                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
+                             DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, S_FUEL_RODS, &
                              TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER, &
                              TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, &
                              VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, &
@@ -415,15 +434,15 @@
          IMPLICIT NONE
          INTEGER, PARAMETER :: NITS_NONLIN_TW = 0 
 ! NITS_NONLIN_TW controls no of non-linear iterations of flux limiter. If NITS_NONLIN_TW = 0 have no flux limiting. 
-         INTEGER, intent( in ) :: NX,NY,NZ,NR,NPHASE, TF_MAX_ITS, TW_MAX_ITS
-         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NR+1),DT
-         REAL, intent( inout ) :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX+1,NY+1,NZ,NPHASE),TWOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: VOLFRA(NX+1,NY+1,NZ,NPHASE),VOLFRAOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: DEN_WATER(NX+1,NY+1,NZ,NPHASE),DEN_WATER_OLD(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-         REAL, intent( inout ) :: VEL(NX+1,NY+1,NZ+1,NPHASE),VELOLD(NX+1,NY+1,NZ+1,NPHASE)
-         REAL, intent( in ) :: TW_BCS(NX+1,NY+1,NZ,NPHASE), DEN_WATER_BCS(NX+1,NY+1,NZ,NPHASE) 
-         REAL, intent( in ) :: VEL_BCS(NX+1,NY+1,NZ+1,NPHASE), VOLFRA_BCS(NX+1,NY+1,NZ,NPHASE), P_BCS(NX+1,NY+1,NZ,NPHASE)
-         INTEGER, intent( in ) :: P_BCS_ON(NX+1,NY+1,NZ,NPHASE)
+         INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, TF_MAX_ITS, TW_MAX_ITS
+         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NX,NY,NZ,NR+1),DT
+         REAL, intent( inout ) :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),TWOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VOLFRAOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER_OLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
+         REAL, intent( inout ) :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE),VELOLD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         REAL, intent( in ) :: TW_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), DEN_WATER_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
+         REAL, intent( in ) :: VEL_BCS(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), VOLFRA_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE), P_BCS(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         INTEGER, intent( in ) :: P_BCS_ON(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
          REAL, intent( in ) :: DEN_CP_FUEL_RODS(NX,NY,NZ,NR), DIFF_FUEL_RODS(NX,NY,NZ,NR), S_FUEL_RODS(NX,NY,NZ,NR)
          REAL, intent( in ) :: TF_ERROR_TOLER,TW_ERROR_TOLER
          INTEGER, intent( in ) :: TF_RELAX,TW_RELAX
@@ -444,18 +463,21 @@
 ! Calculate CP_WATER for the different water phases...
 ! *************************************************
         print *, 'Calculate CP'
-        ALLOCATE(CP_WATER(NX+1,NY+1,NZ,NPHASE), VOL_DEN_CP_WATER(NX+1,NY+1,NZ,NPHASE))
-        CALL CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX,NY,NZ,NPHASE)
+        ALLOCATE(CP_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE), VOL_DEN_CP_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE))
+        CALL CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
         VOL_DEN_CP_WATER=VOLFRA*DEN_WATER*CP_WATER
 
 ! Calculate SIGMA_W & SIGMA_ROD for both water and fuel rods...depends on the average velocity
 ! *************************************************
-        ALLOCATE(SIGMA_W(NX+1,NY+1,NZ,NPHASE), SIGMA_ROD(NX+1,NY+1,NZ,NPHASE)) 
+        ALLOCATE(SIGMA_W(NX_WATER,NY_WATER,NZ_WATER,NPHASE), SIGMA_ROD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)) 
 
         SIGMA_W = 0.0; SIGMA_ROD = 0.0
 
         print *, 'calling CALC_SIGMA_ROD_WATER'  
-        CALL CALC_SIGMA_ROD_WATER( SIGMA_W, SIGMA_ROD, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NPHASE,NR )
+        CALL CALC_SIGMA_ROD_WATER( SIGMA_W, SIGMA_ROD, VOLFRA, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NPHASE,NR )
+!        CALL CALC_SIGMA_ROD_WATER_old( SIGMA_W, SIGMA_ROD, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NPHASE,NR )
+        print *, 'return from CALC_SIGMA_ROD_WATER'
+!        ii
 
 ! **********************************************************************************
 ! Apply bcs to TW and other fields at top and bottom ******************************* 
@@ -466,7 +488,7 @@
         VOLFRA(:,:,K,:) = VOLFRA_BCS(:,:,K,:)
         P(:,:,K) = P_BCS(:,:,K,1)
         VEL(:,:,K,:) = VEL_BCS(:,:,K,:) ! need this for momentum comming into domain even if pressure bc
-        K=NZ
+        K=NZ_WATER
         TW(:,:,K,:)=TW_BCS(:,:,K,:) ! This is only for advection and active only if vel comes into domain from top.
         DEN_WATER(:,:,K,:) = DEN_WATER_BCS(:,:,K,:)
         VOLFRA(:,:,K,:) = VOLFRA_BCS(:,:,K,:)
@@ -475,7 +497,7 @@
 
 ! Axis-symmetric diffusion calculation for rods...
 ! *************************************************
-        CALL AXIS_SYM_DIFF_FUEL_RODS(TF,TFOLD, TW,TWOLD, SIGMA_ROD, DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NR,NPHASE, &
+        CALL AXIS_SYM_DIFF_FUEL_RODS(TF,TFOLD, TW,TWOLD, SIGMA_ROD, DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, &
                                      S_FUEL_RODS, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER)
 
 
@@ -484,14 +506,14 @@
         IF(NPHASE.GT.1) THEN ! multi-phase fluids calculation FOR VELOCITY, PRESSURE, VOLUME FRACTION, DEN_WATER...
            CALL FLUIDS_CALC(TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P, VEL,VELOLD, &
                             VEL_BCS, P_BCS_ON, &
-                            ROD_RADIUS_NODES,DX,DT, NX,NY,NZ,NR,NPHASE, &
+                            ROD_RADIUS_NODES,DX,DT, NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, &
                             VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, &
                             VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER)
         ENDIF
 
 ! calculate HW,SW,KAPPAW for the water subchannels rods...
-        ALLOCATE(SW(NX+1,NY+1,NZ,NPHASE))
-        ALLOCATE(HW(NX+1,NY+1,NZ,NPHASE,NPHASE))
+        ALLOCATE(SW(NX_WATER,NY_WATER,NZ_WATER,NPHASE))
+        ALLOCATE(HW(NX_WATER,NY_WATER,NZ_WATER,NPHASE,NPHASE))
         DO IPHASE=1,NPHASE ! No of fluid phases
            SW(:,:,:,IPHASE)=VOL_DEN_CP_WATER(:,:,:,IPHASE)*TWOLD(:,:,:,IPHASE)/DT  + SIGMA_W(:,:,:,IPHASE)*TF(:,:,:,NR-1) 
            HW(:,:,:,IPHASE,IPHASE) = VOL_DEN_CP_WATER(:,:,:,IPHASE)/DT  + SIGMA_W(:,:,:,IPHASE)
@@ -501,24 +523,24 @@
         print *, "sigma_W", SIGMA_W
 
 ! Add in the vertical velocity (In non-conservative form) as a diffusion term...
-        ALLOCATE(KAPPAW(2,3,NX+1,NY+1,NZ,NPHASE)); KAPPAW=0.0 ! set diffusion to zero until we have a model for this.
+        ALLOCATE(KAPPAW(2,3,NX_WATER,NY_WATER,NZ_WATER,NPHASE)); KAPPAW=0.0 ! set diffusion to zero until we have a model for this.
 
-        ALLOCATE(CONSERV_VERT_ADV(2,NX+1,NY+1,NZ,NPHASE),TW2(NX+1,NY+1,NZ,NPHASE))
+        ALLOCATE(CONSERV_VERT_ADV(2,NX_WATER,NY_WATER,NZ_WATER,NPHASE),TW2(NX_WATER,NY_WATER,NZ_WATER,NPHASE))
         DO ITS_NONLIN_TW = 1, MAX(1,NITS_NONLIN_TW)
            CONSERV_VERT_ADV=0.0
-           DO K=2,NZ-1
+           DO K=2,NZ_WATER-1
            DO IUP=1,2 
               CONSERV_VERT_ADV(IUP,:,:,K,:) = VOL_DEN_CP_WATER(:,:,K,:) * VEL(:,:,K-1+IUP,:) /DX(3) 
            END DO ! DO IUP=1,2
            END DO
 ! apply limiting to TW
-           IF(NITS_NONLIN_TW.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV, VEL, TW, NX+1,NY+1,NZ,NPHASE)
+           IF(NITS_NONLIN_TW.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV, VEL, TW, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
         
 ! CALCULATE THE TEMP OF THE WATER
         print *, "TW_RELAX", TW_RELAX
         print *, 'Calculate water temperature - diffusion_adv_cal'
            CALL DIFFUSION_ADV_CAL(TW,TW2,KAPPAW,CONSERV_VERT_ADV,CONSERV_VERT_ADV,HW,SW, &
-                         NX+1,NY+1,NZ,NPHASE, .FALSE., TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, 1, 0.0)
+                         NX_WATER,NY_WATER,NZ_WATER,NPHASE, .FALSE., TW_RELAX,TW_MAX_ITS,TW_ERROR_TOLER, 1, 0.0)
         print *, "End of TEMP_CALC"
         END DO ! DO ITS_NONLIN_TW = 1, MAX(1,NITS_NONLIN_TW)
         RETURN
@@ -630,11 +652,11 @@
 
 
 
-        SUBROUTINE CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX,NY,NZ,NPHASE)
+        SUBROUTINE CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
 ! Calculate the heat capacity of water and steam...
-        INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
-        REAL, intent( in ) :: TW(NX+1,NY+1,NZ,NPHASE),DEN_WATER(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-        REAL, intent( inout ) :: CP_WATER(NX+1,NY+1,NZ,NPHASE)
+        INTEGER, intent( in ) :: NX_WATER,NY_WATER,NZ_WATER,NPHASE
+        REAL, intent( in ) :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
+        REAL, intent( inout ) :: CP_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
         
         IF(NPHASE==1) THEN ! Just water
 !            CP_WATER=4.2 ! Units in cm and g.
@@ -648,58 +670,81 @@
 
 
 
-        SUBROUTINE CALC_SIGMA_ROD_WATER( SIGMA_W, SIGMA_ROD, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NPHASE,NR )
+        SUBROUTINE CALC_SIGMA_ROD_WATER( SIGMA_W, SIGMA_ROD, VOLFRA, TW, TF, VEL, DX,ROD_RADIUS_NODES, NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NPHASE,NR )
         IMPLICIT NONE
         real, parameter :: PI=4.0*atan(1.0)
-        INTEGER, intent( in ) :: NX,NY,NZ,NR,NPHASE
-        REAL, intent( in ) :: TW(NX+1,NY+1,NZ,NPHASE), TF(NX,NY,NZ,NR), VEL(NX+1,NY+1,NZ+1,NPHASE), DX(3), ROD_RADIUS_NODES(NR+1)
-        REAL, intent( inout ) :: SIGMA_W(NX+1,NY+1,NZ,NPHASE), SIGMA_ROD(NX,NY,NZ,NPHASE)
+        INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE
+        REAL, intent( in ) :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+        REAL, intent( in ) :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE), TF(NX,NY,NZ,NR), VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), DX(3), ROD_RADIUS_NODES(NX,NY,NZ,NR+1)
+        REAL, intent( inout ) :: SIGMA_W(NX_WATER,NY_WATER,NZ_WATER,NPHASE), SIGMA_ROD(NX,NY,NZ,NPHASE)
 ! Local variables...
-        REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_ROD_MEAN
-        REAL :: RADIUS,RE,NU_D,H_WR
-        INTEGER :: IPHASE, II, JJ, iError, i, j, k
-        REAL :: KINEMATIC_VISC_WATER, k_w, Pr
+        REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_MEAN_WATER_CELL
+        REAL :: RE,NU_D,H_WR
+        INTEGER :: IPHASE, II, JJ, iError, i, j, k, III,JJJ, I_ROD_CENTRED
+        REAL :: KINEMATIC_VISC_WATER(3), K_w(3), Pr(3)
         
-        allocate(VEL_ROD_MEAN(NX+1,NY+1,NZ,NPHASE)); VEL_ROD_MEAN = 0.0
+        ALLOCATE(VEL_MEAN_WATER_CELL(NX_WATER,NY_WATER,NZ_WATER,NPHASE)); VEL_MEAN_WATER_CELL = 0.0
+        print *,'NX_WATER,NY_WATER,NZ_WATER,NPHASE:',NX_WATER,NY_WATER,NZ_WATER,NPHASE
 
-        RADIUS=ROD_RADIUS_NODES(NR) ! Radius of control rod.
+!        RADIUS=ROD_RADIUS_NODES(NR) ! Radius of control rod.
 
-        DO K=2,NZ-1 ! Calc mean rod velocity...
-           VEL_ROD_MEAN(:,:,K,:) = 0.5*(VEL(:,:,K,:)+VEL(:,:,K+1,:))
+        IF(NX+1.EQ.NX_WATER) THEN ! Conventional channel centred water cells...
+           I_ROD_CENTRED = 0
+        ELSE ! New channel centred method for 4 channels around a fuel rod...
+           I_ROD_CENTRED = 1
+        ENDIF
+
+        PRINT *,'I_ROD_CENTRED=',I_ROD_CENTRED
+
+        DO K=2,NZ_WATER-1 ! Calc mean rod velocity...
+           VEL_MEAN_WATER_CELL(:,:,K,:) = 0.5*(VEL(:,:,K,:)+VEL(:,:,K+1,:))
         END DO
-        IF(NPHASE==1) THEN ! Just water - Units in cm and g
-           Pr = 7.0 ! Pradle no of water
-           k_w =  0.6 ! conductivity of water (W/(mK)) thus 0.6 W/(mK) becomes 0.6*0.01 W/(cm K)
-           KINEMATIC_VISC_WATER = 1.E-6 ! Water kinematic viscocity m^2/s
-!           KINEMATIC_VISC_WATER = 1.E-2 ! Water kinematic viscocity cm^2/s
+
+           Pr(1) = 7.0 ! Pradle no of water
+           Pr(2) = 1.0 ! Pradle no of steam
+           Pr(3) = 7.0 ! Pradle no of droplets
+           K_w(1) =  0.6 ! Conductivity of water (W/(mK)) thus 0.6 W/(mK) becomes 0.6*0.01 W/(cm K)
+           K_w(2) =  100.0 ! Steam conductivity
+           K_w(3) =  0.6 ! Water droplet conductivity
+           KINEMATIC_VISC_WATER(1) = 1.E-6 ! Water kinematic viscocity m^2/s
+           KINEMATIC_VISC_WATER(2) = 1.E-8 ! Steam kinematic viscocity m^2/s
+           KINEMATIC_VISC_WATER(3) = 1.E-6 ! Water droplet kinematic viscocity m^2/s
            SIGMA_W = 0.0
            SIGMA_ROD = 0.0
-           RADIUS = ROD_RADIUS_NODES(NR) 
+!           RADIUS = ROD_RADIUS_NODES(NR) 
            DO IPHASE=1,NPHASE
            DO K=2,NZ-1
            DO J=2,NY-1
            DO I=2,NX-1
-!              Re= VEL_ROD_MEAN(I,J,K,IPHASE)*0.01 * RADIUS*0.01/  KINEMATIC_VISC_WATER
-              Re= VEL_ROD_MEAN(I,J,K,IPHASE)* RADIUS/  KINEMATIC_VISC_WATER
-              NU_D = 0.332* Re**0.5 *Pr**0.3333333 ! Nusselt no. 
-              H_WR= (k_w/RADIUS)*NU_D ! heat transfer coefficient. 
-              SIGMA_W(I,J,K,IPHASE) = 2.0*PI*RADIUS*H_WR/(DX(1)*DX(2)) ! Volumetric heat tranfer coeff - adjusted for discretization of water temp. 
-!              SIGMA_W(I,J,K,IPHASE) = 100000.0!*2.0*PI*RADIUS*H_WR/(DX(1)*DX(2))
-              !print *, "sigma_w", 2.0*PI*RADIUS*H_WR/(DX(1)*DX(2)) 
-! Share between 4 control rods the volumetric heat tranfer coeff - adjusted for discretization of rod temp. 
+! Loop over water cells surround the fuel rod. 
               DO II=0,1
               DO JJ=0,1
-                 SIGMA_ROD(I+II,J+JJ,K,IPHASE) = SIGMA_ROD(I+II,J+JJ,K,IPHASE) + 0.25 * RADIUS * H_WR ! Just 1/4 of the fuel rod
+! Share between 4 control rods the volumetric heat tranfer coeff - adjusted for discretization of rod temp.  
+                 III = I_ROD_CENTRED * (  (I-1)*2 + II  )  + (1-I_ROD_CENTRED) * ( I+II )
+                 JJJ = I_ROD_CENTRED * (  (J-1)*2 + JJ  )  + (1-I_ROD_CENTRED) * ( J+JJ )
+!                 print *,'i,j,k,ii,jj,iii,jjj,iphase:',i,j,k,ii,jj,iii,jjj,iphase
+!                 print *,'KINEMATIC_VISC_WATER(IPHASE):',KINEMATIC_VISC_WATER(IPHASE)
+!                 print *,'III,JJJ,K,IPHASE:',III,JJJ,K,IPHASE
+                 Re= VEL_MEAN_WATER_CELL(III,JJJ,K,IPHASE)* 2.0*ROD_RADIUS_NODES(I,J,K,NR)/  KINEMATIC_VISC_WATER(IPHASE)
+!                 print *,'here1'
+                 NU_D = 0.332* Re**0.5 *Pr(IPHASE)**0.3333333 ! Nusselt no. 
+                 H_WR= VOLFRA(III,JJJ,K,IPHASE) * (K_w(IPHASE)/ROD_RADIUS_NODES(I,J,K,NR))*NU_D ! heat transfer coefficient.  
+                 !print *, "sigma_w", 2.0*PI*ROD_RADIUS_NODES(I,J,K,NR)*H_WR/(DX(1)*DX(2)) 
+! SIGMA_ROD has to include phase
+                 SIGMA_ROD(I,J,K,IPHASE) = SIGMA_ROD(I,J,K,IPHASE) + 0.25 * ROD_RADIUS_NODES(I,J,K,NR) * H_WR ! Just 1/4 of the fuel rod
+! Volumetric heat tranfer coeff - adjusted for discretization of volume. 
+                 SIGMA_W(III,JJJ,K,IPHASE) = SIGMA_W(III,JJJ,K,IPHASE) + 0.25 * 2.0*PI*ROD_RADIUS_NODES(I,J,K,NR)*H_WR/(DX(1)*DX(2)) ! Just 1/4 of the fuel rod
               END DO
               END DO
            END DO
            END DO
            END DO
            END DO ! DO IPHASE=1,NPHASE
-        ELSE ! Multi-phase system
-        ENDIF
+!           print *,'SIGMA_ROD:',SIGMA_ROD
+!           print *,'SIGMA_W:',SIGMA_W
+!           stop 2811
 
-        deallocate(VEL_ROD_MEAN)
+        deallocate(VEL_MEAN_WATER_CELL)
         
         RETURN
         END SUBROUTINE CALC_SIGMA_ROD_WATER
@@ -709,7 +754,7 @@
 
         SUBROUTINE FLUIDS_CALC(TW,TWOLD, VOLFRA,VOLFRAOLD,DEN_WATER,DEN_WATER_OLD,P, VEL,VELOLD, &
                              VEL_BCS, P_BCS_ON, &
-                             ROD_RADIUS_NODES,DX,DT, NX,NY,NZ,NR,NPHASE, &
+                             ROD_RADIUS_NODES,DX,DT, NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, &
                              VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, &
                              VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER)
 ! This sub calculates the new the fluids velocity VEL, pressure P and volume fraction VOLFRA. 
@@ -744,17 +789,17 @@
          INTEGER, PARAMETER :: NITS_NONLIN_VEL = 0 ! =0 no limiting for velocity and otherwise = no of non-linear limiting iterations
          REAL, PARAMETER :: INFINY = 1.E+14 ! Used in the application of bcs using big sping. 
          INTEGER,  PARAMETER :: NCOLOR = 3 ! No of colours to colout the tridonal pressure matrix.
-         INTEGER, intent( in ) :: NX,NY,NZ,NR,NPHASE, VOLFRA_MAX_ITS, VEL_MAX_ITS
-         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NR+1),DT ! Rod radius needed for drag correlation. 
-         REAL, intent( in ) :: TW(NX+1,NY+1,NZ,NPHASE),TWOLD(NX+1,NY+1,NZ,NPHASE)
+         INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, VOLFRA_MAX_ITS, VEL_MAX_ITS
+         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NX,NY,NZ,NR+1),DT ! Rod radius needed for drag correlation. 
+         REAL, intent( in ) :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),TWOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
          REAL, intent( in ) :: VOLFRA_ERROR_TOLER, VEL_ERROR_TOLER
          INTEGER, intent( in ) :: VOLFRA_RELAX, VEL_RELAX
-         REAL, intent( inout ) :: VOLFRA(NX+1,NY+1,NZ,NPHASE),VOLFRAOLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: DEN_WATER(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-         REAL, intent( in ) :: DEN_WATER_OLD(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( inout ) :: VEL(NX+1,NY+1,NZ+1,NPHASE),VELOLD(NX+1,NY+1,NZ+1,NPHASE)
-         REAL, intent( in ) :: VEL_BCS(NX+1,NY+1,NZ+1,NPHASE)
-         INTEGER, intent( in ) :: P_BCS_ON(NX+1,NY+1,NZ,NPHASE)
+         REAL, intent( inout ) :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VOLFRAOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
+         REAL, intent( in ) :: DEN_WATER_OLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( inout ) :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE),VELOLD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         REAL, intent( in ) :: VEL_BCS(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         INTEGER, intent( in ) :: P_BCS_ON(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
 ! Local variables...
          REAL :: DX_TEMP(3)
          INTEGER :: NX_TEMP,NY_TEMP,NZ_TEMP,NR_TEMP
@@ -770,59 +815,59 @@
          INTEGER :: ITS_NONLIN_VOLFRA, ITS_NONLIN_VEL
 
 
-        ALLOCATE(D_DEN_D_P(NX+1,NY+1,NZ,NPHASE)) 
-        CALL DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX,NY,NZ,NPHASE) ! Use steam tables from FETCH
+        ALLOCATE(D_DEN_D_P(NX_WATER,NY_WATER,NZ_WATER,NPHASE)) 
+        CALL DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) ! Use steam tables from FETCH
 ! Calculate density between the CVs: 
-        ALLOCATE(DEN_WATER_NOD(NX+1,NY+1,NZ+1,NPHASE), VOLFRA_NOD(NX+1,NY+1,NZ+1,NPHASE)) 
-        DEN_WATER_NOD(:,:,2:NZ,:) = 0.5* (DEN_WATER(:,:,1:NZ-1,:) + DEN_WATER(:,:,2:NZ,:))
-        VOLFRA_NOD(:,:,2:NZ,:) = 0.5* (VOLFRA(:,:,1:NZ-1,:) + VOLFRA(:,:,2:NZ,:))
+        ALLOCATE(DEN_WATER_NOD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), VOLFRA_NOD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)) 
+        DEN_WATER_NOD(:,:,2:NZ_WATER,:) = 0.5* (DEN_WATER(:,:,1:NZ_WATER-1,:) + DEN_WATER(:,:,2:NZ_WATER,:))
+        VOLFRA_NOD(:,:,2:NZ_WATER,:) = 0.5* (VOLFRA(:,:,1:NZ_WATER-1,:) + VOLFRA(:,:,2:NZ_WATER,:))
 
-        ALLOCATE(VOLFRA2(NX+1,NY+1,NZ,NPHASE)) 
-        ALLOCATE(VEL2(NX+1,NY+1,NZ+1,NPHASE)) 
+        ALLOCATE(VOLFRA2(NX_WATER,NY_WATER,NZ_WATER,NPHASE)) 
+        ALLOCATE(VEL2(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)) 
 
 
 ! *******************************
 ! Solve for volume fraction...
-        ALLOCATE(S_VOLFRA(NX+1,NY+1,NZ,NPHASE), H_VOLFRA(NX+1,NY+1,NZ,NPHASE,NPHASE))
-        DO K=1,NZ-1
+        ALLOCATE(S_VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE), H_VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE,NPHASE))
+        DO K=1,NZ_WATER-1
            S_VOLFRA(:,:,K,:)=DEN_WATER_OLD(:,:,K,:)*VOLFRAOLD(:,:,K,:)/DT 
         END DO
-        CALL CALC_VOLFRA_MASS_EXCHANGE(H_VOLFRA, DEN_WATER, VOLFRA, VEL, P, NX,NY,NZ,NPHASE) ! Mass exchange term between the phases.
+        CALL CALC_VOLFRA_MASS_EXCHANGE(H_VOLFRA, DEN_WATER, VOLFRA, VEL, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) ! Mass exchange term between the phases.
         DO IPHASE=1,NPHASE
            H_VOLFRA(:,:,:,IPHASE,IPHASE)=  H_VOLFRA(:,:,:,IPHASE,IPHASE) + DEN_WATER(:,:,:,IPHASE)/DT
         END DO
-        ALLOCATE(KAPPA_VOLFRA(2,3,NX+1,NY+1,NZ,NPHASE), CONSERV_VERT_ADV_VOLFRA(2,NX+1,NY+1,NZ,NPHASE) )
+        ALLOCATE(KAPPA_VOLFRA(2,3,NX_WATER,NY_WATER,NZ_WATER,NPHASE), CONSERV_VERT_ADV_VOLFRA(2,NX_WATER,NY_WATER,NZ_WATER,NPHASE) )
         KAPPA_VOLFRA=0.0 ! Zero momentum diffusion to start with - viscocity
 ! the advection velocity matrix term..
         DO ITS_NONLIN_VOLFRA=1,MAX(1,NITS_NONLIN_VOLFRA) ! Non-linear iteration for limiting
-           DO K=2,NZ-1
+           DO K=2,NZ_WATER-1
            DO IUP=1,2
               CONSERV_VERT_ADV_VOLFRA(IUP,:,:,K,:) = DEN_WATER(:,:,K-2+IUP,:)*MAX(VEL(:,:,K-1+IUP,:),0.0)/DX(3)  &
                                                    + DEN_WATER(:,:,K-1+IUP,:)*MIN(VEL(:,:,K-1+IUP,:),0.0)/DX(3) 
            END DO
            END DO
 ! apply limiting to convolution DEN_WATER*VOLFRA
-           IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, DEN_WATER*VOLFRA, NX+1,NY+1,NZ,NPHASE)
+           IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, DEN_WATER*VOLFRA, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
 ! solve
            CALL DIFFUSION_ADV_CAL(VOLFRA,VOLFRA2,KAPPA_VOLFRA,CONSERV_VERT_ADV_VOLFRA,CONSERV_VERT_ADV_VOLFRA,H_VOLFRA,S_VOLFRA, &
-                        NX+1,NY+1,NZ,NPHASE, .FALSE., VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, 1, 0.0)
+                        NX_WATER,NY_WATER,NZ_WATER,NPHASE, .FALSE., VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, 1, 0.0)
         END DO ! DO ITS_NONLIN_VOLFRA=1,MAX(1,NITS_NONLIN_VOLFRA)
 
 
 ! *******************************
 ! Calculate velcity...
-        ALLOCATE( S_VEL(NX+1,NY+1,NZ+1,NPHASE), H_VEL(NX+1,NY+1,NZ+1,NPHASE,NPHASE) )
+        ALLOCATE( S_VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), H_VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE,NPHASE) )
         DO IPHASE=1,NPHASE
-        DO K=2,NZ
+        DO K=2,NZ_WATER
            S_VEL(:,:,K,IPHASE)=DEN_WATER_NOD(:,:,K,IPHASE)*VELOLD(:,:,K,IPHASE)/DT  - (P(:,:,K)-P(:,:,K-1))/DX(3) & ! need pressure in
                          -DEN_WATER_NOD(:,:,K,IPHASE)*GRAVTY
         END DO
         END DO
-        CALL CALC_VEL_ABSORPTION(H_VEL, DEN_WATER_NOD, VOLFRA_NOD, VEL, P, NX,NY,NZ,NPHASE) ! Calculate friction with pipe and between phases.
+        CALL CALC_VEL_ABSORPTION(H_VEL, DEN_WATER_NOD, VOLFRA_NOD, VEL, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) ! Calculate friction with pipe and between phases.
         DO IPHASE=1,NPHASE
            H_VEL(:,:,:,IPHASE,IPHASE)=  H_VEL(:,:,:,IPHASE,IPHASE) + DEN_WATER_NOD(:,:,:,IPHASE)/DT
         END DO
-        ALLOCATE(KAPPA_VEL(2,3,NX+1,NY+1,NZ+1,NPHASE), CONSERV_VERT_ADV_VEL(2,NX+1,NY+1,NZ+1,NPHASE) )
+        ALLOCATE(KAPPA_VEL(2,3,NX_WATER,NY_WATER,NZ_WATER+1,NPHASE), CONSERV_VERT_ADV_VEL(2,NX_WATER,NY_WATER,NZ_WATER+1,NPHASE) )
         KAPPA_VEL=0.0 ! Zero momentum diffusion to start with - viscocity
 ! Apply Dirichlet bcs to velocity but only if not a pressure condition P_BCS_ON=0 using the big spring method. 
 ! Apply bcs to TW and other fields at top and bottom ******************************* 
@@ -830,22 +875,22 @@
            K=2 ! Bottom
            S_VEL(:,:,K,IPHASE) = S_VEL(:,:,K,IPHASE) + REAL( 1 - P_BCS_ON(:,:,K-1,IPHASE) ) * INFINY*VEL_BCS(:,:,K,IPHASE) ! Dirichlet bc
            H_VEL(:,:,K,IPHASE,IPHASE) = REAL( 1 - P_BCS_ON(:,:,K-1,IPHASE) ) *H_VEL(:,:,K,IPHASE,IPHASE) + INFINY ! Dirichlet bc
-           K=NZ ! Top
+           K=NZ_WATER ! Top
            S_VEL(:,:,K,IPHASE) = S_VEL(:,:,K,IPHASE) + REAL( 1 - P_BCS_ON(:,:,K,IPHASE) ) *INFINY*VEL_BCS(:,:,K,IPHASE) ! Dirichlet bc
            H_VEL(:,:,K,IPHASE,IPHASE) = H_VEL(:,:,K,IPHASE,IPHASE) + REAL( 1 - P_BCS_ON(:,:,K,IPHASE) ) *INFINY*VEL_BCS(:,:,K,IPHASE) ! Dirichlet bc
         END DO
         DO ITS_NONLIN_VEL=1,MAX(1,NITS_NONLIN_VEL) ! Non-linear iteration for limiting
 ! The advection velocity matrix term..
-           DO K=2,NZ
+           DO K=2,NZ_WATER
            DO IUP=1,2
               CONSERV_VERT_ADV_VEL(IUP,:,:,K,:) = DEN_WATER_NOD(:,:,K,:)*0.5*(VEL(:,:,K-2+IUP,:)+VEL(:,:,K-1+IUP,:))/DX(3)
            END DO
            END DO
 ! apply limiting
-           IF(NITS_NONLIN_VEL.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VEL, VEL, VEL, NX+1,NY+1,NZ+1,NPHASE)
+           IF(NITS_NONLIN_VEL.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VEL, VEL, VEL, NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
 ! Solve for velocity...
            CALL DIFFUSION_ADV_CAL(VEL,VEL2,KAPPA_VEL,CONSERV_VERT_ADV_VEL,CONSERV_VERT_ADV_VEL,H_VEL,S_VEL, &
-                    NX+1,NY+1,NZ+1,NPHASE, .FALSE., VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER, 1, 0.0)
+                    NX_WATER,NY_WATER,NZ_WATER+1,NPHASE, .FALSE., VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER, 1, 0.0)
         END DO ! DO ITS_NONLIN_VEL=1,MAX(1,NITS_NONLIN_VEL)
 
 
@@ -853,20 +898,20 @@
 ! Calculate pressure...
 
 ! Calculate pressure matrix with matrix colouring method...        
-        ALLOCATE(PCOLOR(NX,NY,NZ),VEC_COL_LONG(NX,NY,NZ,NPHASE),VEC_COL(NX,NY,NZ,NCOLOR)) 
-        ALLOCATE(KAPPA_VOLFRA(2,3,NX+1,NY+1,NZ,NPHASE) )
-        ALLOCATE(CONSERV_VERT_ADV_VOLFRA(2,NX+1,NY+1,NZ,NPHASE), CONSERV_VERT_ADV_VOLFRA_SIGN(2,NX+1,NY+1,NZ,NPHASE) )
+        ALLOCATE(PCOLOR(NX_WATER,NY_WATER,NZ_WATER),VEC_COL_LONG(NX_WATER,NY_WATER,NZ_WATER,NPHASE),VEC_COL(NX_WATER,NY_WATER,NZ_WATER,NCOLOR)) 
+        ALLOCATE(KAPPA_VOLFRA(2,3,NX_WATER,NY_WATER,NZ_WATER,NPHASE) )
+        ALLOCATE(CONSERV_VERT_ADV_VOLFRA(2,NX_WATER,NY_WATER,NZ_WATER,NPHASE), CONSERV_VERT_ADV_VOLFRA_SIGN(2,NX_WATER,NY_WATER,NZ_WATER,NPHASE) )
         DO ICOLOR=1,3
 
            PCOLOR=0.0
-           DO K=1+ICOLOR,NZ-1,3
+           DO K=1+ICOLOR,NZ_WATER-1,3
               PCOLOR(:,:,K)=1.0
            END DO
         
            VEL2=0.0
-           DO K=2,NZ
-           DO J=2,NY
-           DO I=2,NX
+           DO K=2,NZ_WATER
+           DO J=2,NY_WATER
+           DO I=2,NX_WATER
               MAT(:,:) = H_VEL(I,J,K,:,:)
               DO IPHASE=1,NPHASE
                  MAT(IPHASE,IPHASE) = MAT(IPHASE,IPHASE) + DEN_WATER_NOD(I,J,K,IPHASE)/DT
@@ -886,7 +931,7 @@
            
 ! Matrix vector multiplication involving the VEL2 that is VEC_COL=C^T * VEL2
            CONSERV_VERT_ADV_VOLFRA=0.0; CONSERV_VERT_ADV_VOLFRA_SIGN=0.0
-           DO K=2,NZ
+           DO K=2,NZ_WATER
            DO IUP=1,2
 !              CONSERV_VERT_ADV_VOLFRA(IUP,:,:,K,:) = DEN_WATER(:,:,K-1+IUP,:)*VEL2(:,:,K-1+IUP,:)/DX(3)
               CONSERV_VERT_ADV_VOLFRA(IUP,:,:,K,:) = DEN_WATER(:,:,K-1+IUP,:)*0.5*(1.0+SIGN(1.0,VEL(:,:,K-1+IUP,:)))*VEL2(:,:,K-1+IUP,:)/DX(3)  &
@@ -895,11 +940,11 @@
            END DO
            END DO
 ! apply limiting
-           IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, VOLFRA*DEN_WATER, NX+1,NY+1,NZ,NPHASE)
+           IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, VOLFRA*DEN_WATER, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
            H_VOLFRA=0.0; S_VOLFRA=0.0; KAPPA_VOLFRA=0.0 ! Set to zero as we are only doing C^T matrix vector multiplication.
 ! matrix vector
            CALL DIFFUSION_ADV_CAL(VOLFRA,VEC_COL_LONG,KAPPA_VOLFRA,CONSERV_VERT_ADV_VOLFRA,CONSERV_VERT_ADV_VOLFRA_SIGN, H_VOLFRA,S_VOLFRA, &
-                        NX+1,NY+1,NZ,NPHASE, .TRUE., VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER, 1, 0.0) ! Solver not used
+                        NX_WATER,NY_WATER,NZ_WATER,NPHASE, .TRUE., VEL_RELAX,VEL_MAX_ITS,VEL_ERROR_TOLER, 1, 0.0) ! Solver not used
            DO K=2,NZ-1
            DO J=2,NY-1
            DO I=2,NX-1
@@ -915,24 +960,24 @@
 
 ! Caclaulate CT_VEL = C^T * VEL...
 ! Matrix vector multiplication involving the VEL that is VEC_COL=C^T * VEL
-        DO K=2,NZ-1
+        DO K=2,NZ_WATER-1
         DO IUP=1,2
            CONSERV_VERT_ADV_VOLFRA(IUP,:,:,K,:) = DEN_WATER(:,:,K-2+IUP,:)*MAX(VEL(:,:,K-1+IUP,:),0.0)/DX(3)  &
                                                 + DEN_WATER(:,:,K-1+IUP,:)*MIN(VEL(:,:,K-1+IUP,:),0.0)/DX(3) 
         END DO
         END DO
-        ALLOCATE(CT_VEL(NX+1,NY+1,NZ,NPHASE), DP(NX+1,NY+1,NZ)) 
+        ALLOCATE(CT_VEL(NX_WATER,NY_WATER,NZ_WATER,NPHASE), DP(NX_WATER,NY_WATER,NZ_WATER)) 
 ! limiting...
-        IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, VOLFRA*DEN_WATER, NX+1,NY+1,NZ,NPHASE)
+        IF(NITS_NONLIN_VOLFRA.NE.0) CALL AMEND_FOR_LIMITING_CONSERV_VERT_ADV(CONSERV_VERT_ADV_VOLFRA, VEL, VOLFRA*DEN_WATER, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
 ! matrix vector...
         CALL DIFFUSION_ADV_CAL(VOLFRA,CT_VEL,KAPPA_VOLFRA,CONSERV_VERT_ADV_VOLFRA,CONSERV_VERT_ADV_VOLFRA, H_VOLFRA,S_VOLFRA, &
-                     NX+1,NY+1,NZ,NPHASE, .TRUE., VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, 1, 0.0) ! Solver not used
+                     NX_WATER,NY_WATER,NZ_WATER,NPHASE, .TRUE., VOLFRA_RELAX,VOLFRA_MAX_ITS,VOLFRA_ERROR_TOLER, 1, 0.0) ! Solver not used
 
         
 ! SOLVE FOR PRESSURE (use Thomas tri-digonal solver)...
-        DO K=2,NZ-1
-        DO J=2,NY-1
-        DO I=2,NX-1
+        DO K=2,NZ_WATER-1
+        DO J=2,NY_WATER-1
+        DO I=2,NX_WATER-1
           DP(I,J,K) = SUM(CT_VEL(I,J,K,:)/DEN_WATER(I,J,K,:)) ! This is the rhs of the eqn that is being solved 
 ! - DIVID by density of water which is the normalization for global cty eqn
         END DO
@@ -940,10 +985,10 @@
         END DO
 
 
-        ALLOCATE(ABC(NX,NY,NZ,3))
+        ALLOCATE(ABC(NX_WATER,NY_WATER,NZ_WATER,3))
         DO ICOLOR=1,3
 
-           DO K=1+ICOLOR,NZ-1,3
+           DO K=1+ICOLOR,NZ_WATER-1,3
            DO JCOLOR=1,3
               KK=K-1+JCOLOR
               ABC(:,:,K+JCOLOR-2, 4-JCOLOR)=VEC_COL(:,:,KK, ICOLOR) ! Extract tri-diagonal matrix.
@@ -952,10 +997,10 @@
 
         END DO ! DO ICOLOR=1,3
 
-        DO J=2,NY-1
-        DO I=2,NX-1
+        DO J=2,NY_WATER-1
+        DO I=2,NX_WATER-1
            DP(I,J,1)=0.0; DP(I,J,NZ)=0.0 ! Set halos of pressure to zero then solve for pressure...
-           CALL tridag( ABC(I,J,2:NZ-1,1), ABC(I,J,2:NZ-1,2), ABC(I,J,2:NZ-1,3), DP(I,J,2:NZ-1),NZ-2)
+           CALL tridag( ABC(I,J,2:NZ_WATER-1,1), ABC(I,J,2:NZ_WATER-1,2), ABC(I,J,2:NZ_WATER-1,3), DP(I,J,2:NZ_WATER-1),NZ_WATER-2)
         END DO
         END DO
         P = P + DP ! Update pressure
@@ -964,9 +1009,9 @@
 ! *******************************
 ! Calculate velocity correction...
         VEL=0.0
-        DO K=2,NZ
-        DO J=2,NY
-        DO I=2,NX
+        DO K=2,NZ_WATER
+        DO J=2,NY_WATER-1
+        DO I=2,NX_WATER-1
 
            MAT(:,:) = H_VEL(I,J,K,:,:)
            DO IPHASE=1,NPHASE
@@ -985,7 +1030,7 @@
         END DO
         END DO
 
-        CALL DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX,NY,NZ,NPHASE) ! Use steam tables from FETCH
+        CALL DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) ! Use steam tables from FETCH
 
         RETURN
         END SUBROUTINE FLUIDS_CALC
@@ -993,23 +1038,23 @@
 
 
 
-        SUBROUTINE DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX,NY,NZ,NPHASE)
+        SUBROUTINE DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
           ! Use steam tables from FETCH to calculate DEN_WATER,D_DEN_D_P
           ! DEN_WATER=water density of all the phases
           ! D_DEN_D_P=derivative of density w.r.t. pressure.
           use steam_nrs_module
           IMPLICIT NONE
-          INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
-          REAL, intent( in ) ::  TW(NX+1,NY+1,NZ,NPHASE), P(NX+1,NY+1,NZ)
-          REAL, intent( inout ) :: D_DEN_D_P(NX+1,NY+1,NZ,NPHASE), DEN_WATER(NX+1,NY+1,NZ,NPHASE)
+          INTEGER, intent( in ) ::  NX_WATER,NY_WATER,NZ_WATER,NPHASE
+          REAL, intent( in ) ::  TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE), P(NX_WATER,NY_WATER,NZ_WATER-1)
+          REAL, intent( inout ) :: D_DEN_D_P(NX_WATER,NY_WATER,NZ_WATER-1,NPHASE), DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
           ! Local variables...
           REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_CV
           INTEGER :: I,J,K,IPHASE
           real :: dummy, dpdrho_vap, dpdrho_liq
 
-          do i = 1, nx+1
-             do j = 1, ny+1
-                do k = 1, nz+1
+          do i = 1, nx_water
+             do j = 1, ny_water
+                do k = 1, nz_water
                    do iphase = 1, nphase
                       call STEAM_NRS( P(i,j,k), TW(i,j,k,iphase),  &
                            dummy, dummy, dummy, dummy, &
@@ -1030,20 +1075,20 @@
 
 
 
-        SUBROUTINE CALC_VOLFRA_MASS_EXCHANGE(H_VOLFRA, DEN_WATER, VOLFRA, VEL, P, NX,NY,NZ,NPHASE) 
+        SUBROUTINE CALC_VOLFRA_MASS_EXCHANGE(H_VOLFRA, DEN_WATER, VOLFRA, VEL, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
 ! Mass exchange term between the phases in H_VOLFRA
          IMPLICIT NONE
-         INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
-         REAL, intent( inout ) :: H_VOLFRA(NX+1,NY+1,NZ,NPHASE,NPHASE) ! DEFINES MASS EXCHANGE
-         REAL, intent( in ) :: VOLFRA(NX+1,NY+1,NZ,NPHASE)
-         REAL, intent( in ) :: DEN_WATER(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-         REAL, intent( in ) :: VEL(NX+1,NY+1,NZ+1,NPHASE)
+         INTEGER, intent( in ) :: NX_WATER,NY_WATER,NZ_WATER,NPHASE
+         REAL, intent( inout ) :: H_VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE,NPHASE) ! DEFINES MASS EXCHANGE
+         REAL, intent( in ) :: VOLFRA(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+         REAL, intent( in ) :: DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
+         REAL, intent( in ) :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
 ! Local variables...
          REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_CV
          INTEGER :: I,J,K,IPHASE
 
-         ALLOCATE(VEL_CV(NX+1, NY+1, NZ, NPHASE))
-         DO K=1,NZ
+         ALLOCATE(VEL_CV(NX_WATER+1, NY_WATER+1, NZ_WATER, NPHASE))
+         DO K=1,NZ_WATER
             VEL_CV(:,:,K,:) = 0.5*( VEL(:,:,K,:) + VEL(:,:,K+1,:) ) 
          END DO
         RETURN
@@ -1052,14 +1097,14 @@
 
 
 
-        SUBROUTINE CALC_VEL_ABSORPTION(H_VEL, DEN_WATER_NOD, VOLFRA_NOD, VEL, P, NX,NY,NZ,NPHASE) 
+        SUBROUTINE CALC_VEL_ABSORPTION(H_VEL, DEN_WATER_NOD, VOLFRA_NOD, VEL, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
 ! Calculate friction with pipe and between phases in H_VEL.
          IMPLICIT NONE
-         INTEGER, intent( in ) :: NX,NY,NZ,NPHASE
-         REAL, intent( inout ) :: H_VEL(NX+1,NY+1,NZ+1,NPHASE,NPHASE)
-         REAL, intent( in ) :: VOLFRA_NOD(NX+1,NY+1,NZ+1,NPHASE)
-         REAL, intent( in ) :: DEN_WATER_NOD(NX+1,NY+1,NZ,NPHASE),P(NX+1,NY+1,NZ)
-         REAL, intent( inout ) :: VEL(NX+1,NY+1,NZ+1,NPHASE)
+         INTEGER, intent( in ) :: NX_WATER,NY_WATER,NZ_WATER,NPHASE
+         REAL, intent( inout ) :: H_VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE,NPHASE)
+         REAL, intent( in ) :: VOLFRA_NOD(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
+         REAL, intent( in ) :: DEN_WATER_NOD(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
+         REAL, intent( inout ) :: VEL(NX_WATER,NY_WATER,NZ_WATER+1,NPHASE)
         RETURN
         END SUBROUTINE CALC_VEL_ABSORPTION
 
@@ -1113,7 +1158,7 @@
 
 
 
-        SUBROUTINE AXIS_SYM_DIFF_FUEL_RODS(TF,TFOLD, TW,TWOLD, SIGMA_ROD,  DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NR,NPHASE, &
+        SUBROUTINE AXIS_SYM_DIFF_FUEL_RODS(TF,TFOLD, TW,TWOLD, SIGMA_ROD,  DX,ROD_RADIUS_NODES,DT,NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, &
                                            S_FUEL_RODS, DEN_CP_FUEL_RODS, DIFF_FUEL_RODS, TF_RELAX,TF_MAX_ITS,TF_ERROR_TOLER)
 ! Axis-symmetric diffusion of temperature for rods...
 ! TF,TFOLD are the lattest and previos time level values of rod temperatures. 
@@ -1141,11 +1186,11 @@
 ! TF_ERROR_TOLER = error tolerence for convergence mas=x difference between temps from 2 consecutive iterations. 
 ! Similarly for other solver options. 
          IMPLICIT NONE
-         INTEGER, intent( in ) :: NX,NY,NZ,NR,NPHASE, TF_MAX_ITS
-         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NR+1),DT
+         INTEGER, intent( in ) :: NX,NY,NZ,NX_WATER,NY_WATER,NZ_WATER,NR,NPHASE, TF_MAX_ITS
+         REAL, intent( in ) :: DX(3),ROD_RADIUS_NODES(NX,NY,NZ,NR+1),DT
          REAL, intent( inout ) :: TF(NX,NY,NZ,NR),TFOLD(NX,NY,NZ,NR), SIGMA_ROD(NX,NY,NZ,NPHASE) 
 ! Its NPHASE in SIGMA_ROD as we have to distribute cooling from water/gas phases.
-         REAL, intent( in ) :: TW(NX+1,NY+1,NZ,1),TWOLD(NX+1,NY+1,NZ,1)
+         REAL, intent( in ) :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),TWOLD(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
          REAL, intent( in ) :: DEN_CP_FUEL_RODS(NX,NY,NZ,NR), DIFF_FUEL_RODS(NX,NY,NZ,NR), S_FUEL_RODS(NX,NY,NZ,NR)
          REAL, intent( in ) :: TF_ERROR_TOLER
          INTEGER, intent( in ) :: TF_RELAX
@@ -1155,10 +1200,10 @@
          REAL, DIMENSION(:,:,:,:), allocatable :: TF_TEMP, TFOLD_TEMP, DEN_CP_FUEL_RODS_TEMP, S_TEMP, DIFF_FUEL_RODS_TEMP
          REAL, DIMENSION(:,:,:,:), allocatable :: TF2_TEMP
          REAL, DIMENSION(:,:,:,:), allocatable :: H_DIAG_TEMP
-         REAL, DIMENSION(:), allocatable ::  MID_RADIUS
+         REAL, DIMENSION(:,:,:,:), allocatable ::  MID_RADIUS
          REAL, DIMENSION(:,:,:,:,:,:), allocatable :: KAPPA_FUEL
          REAL, DIMENSION(:,:, :,:, :), allocatable :: CONSERV_VERT_ADV(:,:, :,:, :)
-         INTEGER :: I,J,K,G,IPHASE
+         INTEGER :: I,J,K,G,IPHASE, IR
 
 ! tranform to the following coords FOR SOLUTION:
 ! x-coord will be along radial direction. 
@@ -1183,9 +1228,9 @@
         END DO   
 
 ! The radius between CVs 'nodes':
-        ALLOCATE(MID_RADIUS(NR))
-        DO I=1,NR
-           MID_RADIUS(I)=0.5*(ROD_RADIUS_NODES(I)+ROD_RADIUS_NODES(I+1))
+        ALLOCATE(MID_RADIUS(NX,NY,NZ,NR))
+        DO IR=1,NR
+           MID_RADIUS(:,:,:,IR)=0.5*(ROD_RADIUS_NODES(:,:,:,IR)+ROD_RADIUS_NODES(:,:,:,IR+1))
         END DO   
 !
 ! calculate H_S_KAPPA for the fuel rods...
@@ -1195,8 +1240,8 @@
         S_TEMP=0.0
         DO I=1,NX
         DO G=1,NR
-           H_DIAG_TEMP(G,:,:,I)= MID_RADIUS(G) * DEN_CP_FUEL_RODS_TEMP(G,:,:,I) / DT 
-           S_TEMP(G,:,:,I)= MID_RADIUS(G)*( S_FUEL_RODS(I,:,:,G) + DEN_CP_FUEL_RODS_TEMP(G,:,:,I)*TFOLD_TEMP(G,:,:,I)/DT  )
+           H_DIAG_TEMP(G,:,:,I)= MID_RADIUS(I,:,:,G) * DEN_CP_FUEL_RODS_TEMP(G,:,:,I) / DT 
+           S_TEMP(G,:,:,I)= MID_RADIUS(I,:,:,G)*( S_FUEL_RODS(I,:,:,G) + DEN_CP_FUEL_RODS_TEMP(G,:,:,I)*TFOLD_TEMP(G,:,:,I)/DT  )
         END DO
         END DO
 !
@@ -1206,15 +1251,15 @@
         KAPPA_FUEL=0.0
         DO G=1,NG_TEMP ! No of energy groups
         DO K=2,NZ_TEMP-1
-        DO J=2,NY_TEMP-1
+        DO J=2,NY_TEMP-1 
         DO I=2,NX_TEMP-1
-           KAPPA_FUEL(1,1,I,J,K,G)=ROD_RADIUS_NODES(I)  *0.5*( DIFF_FUEL_RODS_TEMP(I-1,J,K,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) &
-                                  /MAX( ((ROD_RADIUS_NODES(I+1)-ROD_RADIUS_NODES(I))*(MID_RADIUS(I)-MID_RADIUS(I-1))), TOLER)
-           KAPPA_FUEL(2,1,I,J,K,G)=ROD_RADIUS_NODES(I+1)*0.5*( DIFF_FUEL_RODS_TEMP(I+1,J,K,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) &
-                                  /MAX( ((ROD_RADIUS_NODES(I+1)-ROD_RADIUS_NODES(I))*(MID_RADIUS(I+1)-MID_RADIUS(I))), TOLER)
+           KAPPA_FUEL(1,1,I,J,K,G)=ROD_RADIUS_NODES(G,J,K,I)  *0.5*( DIFF_FUEL_RODS_TEMP(I-1,J,K,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) &
+                                  /MAX( ((ROD_RADIUS_NODES(G,J,K,I+1)-ROD_RADIUS_NODES(G,J,K,I))*(MID_RADIUS(G,J,K,I)-MID_RADIUS(G,J,K,I-1))), TOLER)
+           KAPPA_FUEL(2,1,I,J,K,G)=ROD_RADIUS_NODES(G,J,K,I+1)*0.5*( DIFF_FUEL_RODS_TEMP(I+1,J,K,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) &
+                                  /MAX( ((ROD_RADIUS_NODES(G,J,K,I+1)-ROD_RADIUS_NODES(G,J,K,I))*(MID_RADIUS(G,J,K,I+1)-MID_RADIUS(G,J,K,I))), TOLER)
 
-           KAPPA_FUEL(1,3,I,J,K,G)=MID_RADIUS(I) *0.5*( DIFF_FUEL_RODS_TEMP(I,J,K-1,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) /DX(3)**2 ! Z is still Z thus using DX(3)
-           KAPPA_FUEL(2,3,I,J,K,G)=MID_RADIUS(I) *0.5*( DIFF_FUEL_RODS_TEMP(I,J,K+1,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) /DX(3)**2
+           KAPPA_FUEL(1,3,I,J,K,G)=MID_RADIUS(G,J,K,I) *0.5*( DIFF_FUEL_RODS_TEMP(I,J,K-1,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) /DX(3)**2 ! Z is still Z thus using DX(3)
+           KAPPA_FUEL(2,3,I,J,K,G)=MID_RADIUS(G,J,K,I) *0.5*( DIFF_FUEL_RODS_TEMP(I,J,K+1,G)+DIFF_FUEL_RODS_TEMP(I,J,K,G) ) /DX(3)**2
         END DO
         END DO
         END DO
@@ -2148,10 +2193,10 @@ print *, 'error_g', error, 'its_g', its_g
       END SUBROUTINE ELGS
 !
 
-      subroutine  write_tw_btm(NX, NY, NZ, NPHASE, TW)
+      subroutine  write_tw_btm(NX_WATER,NY_WATER,NZ_WATER, NPHASE, TW)
          implicit none
-         integer, intent(in) :: NX, NY, NZ, NPHASE
-         real, intent(in)    :: TW(NX+1,NY+1,NZ,NPHASE) 
+         integer, intent(in) :: NX_WATER,NY_WATER,NZ_WATER, NPHASE
+         real, intent(in)    :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
          integer i, j, k, iphase, io
 
          io = 143
@@ -2162,34 +2207,36 @@ print *, 'error_g', error, 'its_g', its_g
          write(io,*) "# set pm3d map "
          write(io,*) "# splot './water-temp_btm.dat' us 1:2:4 with pm3d "
          write(io,*) "# x y z nPhase value"
-         do i=1,NX
-         do j=1,NY
-         do iphase=1,NPHASE
-             write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
-         enddo
-         enddo
-         write(io,'(3i8,g16.4)')
-         enddo
+            do i=1,NX_WATER-1
+            do j=1,NY_WATER-1
+            do iphase=1,NPHASE
+                write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
+            enddo
+            enddo
+            write(io,'(3i8,g16.4)')
+            enddo
          close(io)
      end subroutine  write_tw_btm
 
-      subroutine  write_tw_top(NX, NY, NZ, NPHASE, TW)
+
+
+      subroutine  write_tw_top(NX_WATER,NY_WATER,NZ_WATER, NPHASE, TW)
          implicit none
-         integer, intent(in) :: NX, NY, NZ, NPHASE
-         real, intent(in)    :: TW(NX+1,NY+1,NZ,NPHASE) 
+         integer, intent(in) :: NX_WATER,NY_WATER,NZ_WATER, NPHASE
+         real, intent(in)    :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
          integer i, j, k, iphase,  io
 
          io = 143
          open(io, file='water-temp_top.dat')
-         k=NZ-1
+         k=NZ_WATER-1
          write(io,*) "# to plot this at a terminal type... "
          write(io,*) "# gnuplot "
          write(io,*) "# set pm3d map "
          write(io,*) "# splot './water-temp_top.dat' us 1:2:4 with pm3d "
          write(io,*) "# "
          write(io,*) "# x y z nPhase value"
-         do i=1,NX
-         do j=1,NY
+         do i=1,NX_WATER-1
+         do j=1,NY_WATER-1
          do iphase=1,NPHASE
              write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
          enddo
@@ -2199,26 +2246,38 @@ print *, 'error_g', error, 'its_g', its_g
          close(io)
      end subroutine  write_tw_top
 
-      subroutine  write_tw_height(NX, NY, NZ, NPHASE, TW)
+      subroutine  write_tw_height(NX_WATER,NY_WATER,NZ_WATER, NPHASE, TW)
          implicit none
-         integer, intent(in) :: NX, NY, NZ, NPHASE
-         real, intent(in)    :: TW(NX+1,NY+1,NZ,NPHASE) 
-         integer i, j, k, iphase,  io
+         integer, intent(in) :: NX_WATER,NY_WATER,NZ_WATER, NPHASE
+         real, intent(in)    :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE) 
+         integer i, j, k, iphase, io
 
          io = 143
-         open(io, file='water-temp-height.dat')
-!         write(io,*) "# to plot this at a terminal type... "
-!         write(io,*) "# gnuplot "
-!         write(io,*) "# plot './water-temp-height.dat' with linesp "
-!         write(io,*) "# "
-!         write(io,*) "# k value"
-         i=2
-         j=2
-         iphase = 1
-         do k=1,NZ
-         write(io,'(i8,g16.4)') k, tw(i,j,k,iphase)        
-         enddo
-
+         open(io, file='water-temp_btm.dat')
+         k=2
+         write(io,*) "# to plot this at a terminal type... "
+         write(io,*) "# gnuplot "
+         write(io,*) "# set pm3d map "
+         write(io,*) "# splot './water-temp_height.dat' us 1:2:4 with pm3d "
+         write(io,*) "# x y z nPhase value"
+         if(.false.) then
+            do i=1,NX_WATER-1
+            do j=1,NY_WATER-1
+            do iphase=1,NPHASE
+                write(io,'(3i8,g16.4)') i, j, iphase, tw(i,j,k,iphase)        
+            enddo
+            enddo
+            enddo
+         else
+            i=2
+            j=2
+            do k=1,NZ_WATER
+            do iphase=1,NPHASE
+                write(io,*) tw(i,j,k,iphase)        
+            enddo
+            enddo
+         endif
+         write(io,'(3i8,g16.4)')
          close(io)
      end subroutine  write_tw_height
 
@@ -2226,7 +2285,7 @@ print *, 'error_g', error, 'its_g', its_g
          implicit none
          integer, intent(in) :: NX, NY, NZ, NR
          real, intent(in)    :: TF(NX,NY,NZ,NR)
-         real, intent(in)    :: ROD_RADIUS_NODES(NR+1)
+         real, intent(in)    :: ROD_RADIUS_NODES(NX,NY,NZ,NR+1)
          integer i, j, k, io, IR
 
          io = 143
@@ -2236,10 +2295,11 @@ print *, 'error_g', error, 'its_g', its_g
          write(io,*) "# pl './fuel-temp.dat' w linesp pt 7 ps 1.2 "
          write(io,*) "#  "
          write(143,*) "# radial node , value for cell i=2,j=2,k=2"
-         i = 2; j = 2; k = 2
+!         i = 2; j = 2; k = 2
+         i = 2; j = 2; k = nr-1
          do IR=2,NR-1 ! omit halo elements / nodes
-             write(143,'(2g16.4)') ROD_RADIUS_NODES(IR),   tf(i,j,k,IR)        
-             write(143,'(2g16.4)') ROD_RADIUS_NODES(IR+1), tf(i,j,k,IR)        
+             write(143,'(2g16.4)') ROD_RADIUS_NODES(i,j,k,IR),   tf(i,j,k,IR)        
+             write(143,'(2g16.4)') ROD_RADIUS_NODES(i,j,k,IR+1), tf(i,j,k,IR)        
          enddo
          close(143)
 
