@@ -1,7 +1,7 @@
       program fluids_only
       
          implicit none
-       INTEGER, PARAMETER :: NX=3,NY=3,NZ=10,NR=6,NPHASE=1
+       INTEGER, PARAMETER :: NX=3,NY=3,NZ=10,NR=6,NPHASE=1!,NPHASE=2
 !       INTEGER, PARAMETER :: NX=3,NY=3,NZ=62,NR=32,NPHASE=1
        INTEGER, PARAMETER :: NX_WATER=NX+1,NY_WATER=NY+1,NZ_WATER=NZ
          INTEGER :: TF_MAX_ITS, TW_MAX_ITS, NSTEP_ITS

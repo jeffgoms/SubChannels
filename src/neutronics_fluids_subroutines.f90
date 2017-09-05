@@ -652,20 +652,37 @@
 
 
 
-        SUBROUTINE CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
-! Calculate the heat capacity of water and steam...
-        INTEGER, intent( in ) :: NX_WATER,NY_WATER,NZ_WATER,NPHASE
-        REAL, intent( in ) :: TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE),DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE),P(NX_WATER,NY_WATER,NZ_WATER)
-        REAL, intent( inout ) :: CP_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
-        
-        IF(NPHASE==1) THEN ! Just water
-!            CP_WATER=4.2 ! Units in cm and g.
-            CP_WATER=4.2e+3 ! Units in m and kg.
-        ELSE
-        ENDIF
+  SUBROUTINE CALCULATE_CP_WATER(DEN_WATER, CP_WATER, TW, P, NX_WATER, NY_WATER, NZ_WATER, NPHASE)
+    ! Calculate the heat capacity of water and steam...
+    use steam_nrs_module
+    IMPLICIT NONE
+    INTEGER, intent( in ) :: NX_WATER, NY_WATER, NZ_WATER,NPHASE
+    REAL, intent( in ) :: TW(NX_WATER, NY_WATER, NZ_WATER, NPHASE), P(NX_WATER, NY_WATER, NZ_WATER)
+    REAL, intent( inout ) :: CP_WATER(NX_WATER, NY_WATER, NZ_WATER, NPHASE), DEN_WATER(NX_WATER, NY_WATER, NZ_WATER, NPHASE)
+    INTEGER :: I,J,K,IPHASE
+    real :: dummy, dpdrho_vap, dpdrho_liq
 
-        RETURN
-        END SUBROUTINE CALCULATE_CP_WATER
+    IF(NPHASE==1) THEN ! Just water
+       !            CP_WATER=4.2 ! Units in cm and g.
+       CP_WATER=4.2e+3 ! Units in m and kg.
+
+    ELSE
+       do i = 1, NX_WATER
+          do j = 1, NY_WATER
+             do k = 1, NZ_WATER
+                do iphase = 1, nphase
+                   call STEAM_NRS( P(i,j,k), TW(i,j,k,iphase),  &
+                        dummy, dummy, dummy, dummy, &
+                        den_water(i,j,k,1), den_water(i,j,k,2), cp_water(i,j,k,1), cp_water(i,j,k,2),&
+                        dummy, dummy )
+                end do
+             end do
+          end do
+       end do
+    ENDIF
+
+    RETURN
+  END SUBROUTINE CALCULATE_CP_WATER
 
 
 
@@ -1038,15 +1055,15 @@
 
 
 
-        SUBROUTINE DEN_FUNCTION_WATER(DEN_WATER,D_DEN_D_P, TW,P, NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+        SUBROUTINE DEN_FUNCTION_WATER(DEN_WATER, D_DEN_D_P, TW,P, NX_WATER, NY_WATER, NZ_WATER, NPHASE)
           ! Use steam tables from FETCH to calculate DEN_WATER,D_DEN_D_P
           ! DEN_WATER=water density of all the phases
           ! D_DEN_D_P=derivative of density w.r.t. pressure.
           use steam_nrs_module
           IMPLICIT NONE
-          INTEGER, intent( in ) ::  NX_WATER,NY_WATER,NZ_WATER,NPHASE
-          REAL, intent( in ) ::  TW(NX_WATER,NY_WATER,NZ_WATER,NPHASE), P(NX_WATER,NY_WATER,NZ_WATER-1)
-          REAL, intent( inout ) :: D_DEN_D_P(NX_WATER,NY_WATER,NZ_WATER-1,NPHASE), DEN_WATER(NX_WATER,NY_WATER,NZ_WATER,NPHASE)
+          INTEGER, intent( in ) ::  NX_WATER, NY_WATER, NZ_WATER, NPHASE
+          REAL, intent( in ) ::  TW(NX_WATER, NY_WATER, NZ_WATER, NPHASE), P(NX_WATER, NY_WATER, NZ_WATER)
+          REAL, intent( inout ) :: D_DEN_D_P(NX_WATER, NY_WATER, NZ_WATER, NPHASE), DEN_WATER(NX_WATER, NY_WATER, NZ_WATER, NPHASE)
           ! Local variables...
           REAL, DIMENSION( : , : , :, : ), allocatable :: VEL_CV
           INTEGER :: I,J,K,IPHASE
@@ -1058,21 +1075,18 @@
                    do iphase = 1, nphase
                       call STEAM_NRS( P(i,j,k), TW(i,j,k,iphase),  &
                            dummy, dummy, dummy, dummy, &
-                           den_water(i,j,k,1), den_water(i,j,k,2), &
-                           dummy, dummy, &
-                           dpdrho_vap, dpdrho_liq )
-                      d_den_d_p(i,j,k,1) = 1./dpdrho_vap 
-                      d_den_d_p(i,j,k,2) = 1./dpdrho_liq
-                      print*, P(i,j,k), TW(i,j,k,iphase), d_den_d_p(i,j,k,1), d_den_d_p(i,j,k,2)
+                           den_water(i,j,k,1), den_water(i,j,k,2), dummy, dummy, &
+                           dpdrho_liq, dpdrho_vap )
+                      d_den_d_p(i,j,k,1) = 1./dpdrho_liq 
+                      d_den_d_p(i,j,k,2) = 1./dpdrho_vap
+                      !print*, P(i,j,k), TW(i,j,k,iphase), d_den_d_p(i,j,k,1), d_den_d_p(i,j,k,2)
                    end do
                 end do
              end do
           end do
-          stop 8779
 
           RETURN
         END SUBROUTINE DEN_FUNCTION_WATER
-
 
 
         SUBROUTINE CALC_VOLFRA_MASS_EXCHANGE(H_VOLFRA, DEN_WATER, VOLFRA, VEL, P, NX_WATER,NY_WATER,NZ_WATER,NPHASE) 

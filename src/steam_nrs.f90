@@ -35,25 +35,40 @@ module steam_nrs_module
 
     SUBROUTINE STEAM_NRS( Pressure, Temperature,  &
          Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
-         Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, &
-         DPDRHO_Vap, DPDRHO_Liq )
+         Density_Liq, Density_Vap, Cp_Liq, Cp_Vap, &
+         DPDRHO_Liq, DPDRHO_Vap )
 
       implicit none
       real, intent(in) :: Pressure, Temperature
       real, intent(inout) :: Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
            Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, DPDRHO_Vap, DPDRHO_Liq
 
+      !! Units (input):
+      !!   Pressure: kg/(m.s2)
+      !!   Temperature: degree C
+
       call outvolume( Pressure, Temperature, &
            Density_Bulk, DPDRHO, LatentHeat, Cp_Bulk, &
            Density_Vap, Density_Liq, Cp_Vap, Cp_Liq, &
            DPDRHO_Vap, DPDRHO_Liq )
-      !! Units:
-      !!   Pressure: g/(cm.s2)
-      !!   Temperature: degree C
-      !!   DPDRHO: MPa*cm3/g
-      !!   Density_Phase: g/cm3
-      !!   LatentHeat: J/g
-      !!   Cp: J/(g.K)
+
+      !! Units (output):
+      !!   DPDRHO: MPa*cm3/g --> m2/s2
+      !!   LatentHeat: J/g --> J/kg
+      !!   Cp: J/(g.K) --> J/(kg.K)
+      DPDRHO_Liq =  DPDRHO_Liq * 1.e3 ; DPDRHO_Vap =  DPDRHO_Vap * 1.e3
+
+      !! Units (output):
+      !!   Density_Phase: g/cm3 --> kg/m3
+      Density_Vap = Density_Vap * 1.e3 ; Density_Liq = Density_Liq * 1.e3
+
+      !! Units (output):
+      !!   LatentHeat: J/g --> J/kg
+      LatentHeat = LatentHeat * 1.e3
+
+      !! Units (output):
+      !!   Cp: J/(g.K) --> J/(kg.K)
+      Cp_Vap = Cp_Vap * 1.e3 ; Cp_Liq = Cp_Liq * 1.e3 
 
       return
     end subroutine STEAM_NRS
@@ -77,14 +92,15 @@ module steam_nrs_module
       real Enthalpy, Enthalpy_Liq, Enthalpy_Vap, Cp_Vap, Cp_Liq, DPDRHO_Vap, DPDRHO_Liq
 
 !!! Units conversion:
-!!!   1. Pressure:
-!!!       Input: g/(cm.s^2) --> Output: MPa
-!!!   2. Temperature:
-!!!       Input: degree C   --> Output: K
+!!!   1. Pressure (NRS model constraint: 100. <= P < 1.5e9 kg/(m.s2) )
+!!!       Input: kg/(m.s^2) --> Output: MPa
+      pp = p * 1.e-6 ; pp = min( 1500., max( pp, 1.e-1 ) )
 
-      tt = t + 273.15
-      pp = p * 1.e-7
-      rhostart = 5.9 ; rhol = rhostart ; rhov = rhostart/1000. ! Initialisation of density
+!!! Units conversion:
+!!!   2. Temperature (NRS model constraint: 273.15 <= T <= 1273.15 K ):
+!!!       Input: degree C   --> Output: K
+      tt = t + 273.15 ;  tt = min( 1273.15, max( tt, 273.15))
+      rhostart = 1.9 ; rhol = rhostart ; rhov = rhostart/1000. ! Initialisation of density
 
       call dense(pp,tt,rhostart, rho, dpdr )
       call calc_volume(tt,rho,v,dvdt,dvdr)
